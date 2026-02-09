@@ -9,6 +9,7 @@ JavaScript SDK for real-time voice and video calls with WebRTC. This SDK works a
 * [Quick Start](#quick-start)
 * [Media Flow Types](#media-flow-types)
 * [Call Methods](#call-methods)
+* [Error Handling](#error-handling)
 * [Call Events](#call-events)
 * [Client Events](#client-events)
 * [Call Management](#call-management)
@@ -107,6 +108,68 @@ await call.selectAudioDevice(mics[0].deviceId);
 await call.addParticipants(['user3', 'user4']);
 await call.switchToSFU();  // Upgrade P2P to SFU
 ```
+
+## Error Handling
+
+All methods return `CallClientResult<T>` with structured error information instead of throwing exceptions:
+
+### Pattern 1: Check Result Success
+
+```typescript
+const result = await call.enableVideo(true);
+if (!result.success) {
+  console.error('Error:', result.error?.message);
+  console.error('Code:', result.error?.code);
+}
+```
+
+### Pattern 2: Use Error Callback
+
+Some methods support optional error callbacks for real-time error feedback:
+
+```typescript
+const handleError = (result) => {
+  if (result.error) {
+    console.error(result.error.message);
+  }
+};
+
+// Methods with error callback support:
+const joinResult = callClient.join(options, handleError);        // error callback
+callClient.reject(call, reason, handleError);                    // error callback
+const videoResult = await call.enableVideo(true, handleError);   // error callback
+await call.startScreenShare(handleError);                        // error callback
+await call.stopScreenShare(handleError);                         // error callback
+call.mute(true, handleError);                                    // error callback
+await call.switchToSFU(handleError);                             // error callback
+```
+
+**Methods Supporting Error Callbacks:**
+- `callClient.join(options, errorCallback?)` - Called on join errors
+- `callClient.reject(call, reason?, errorCallback?)` - Called on reject errors
+- `callClient.leave(call)` - No callback (check result instead)
+- `call.enableVideo(enabled, errorCallback?)` - Called on video/camera errors
+- `call.startScreenShare(errorCallback?)` - Called on screen share errors
+- `call.stopScreenShare(errorCallback?)` - Called on stop errors
+- `call.mute(mute, errorCallback?)` - Called on mute errors
+- `call.switchToSFU(errorCallback?)` - Called on SFU switch errors
+
+**All Error Codes:**
+
+| Code | Error Type | Cause | Solution |
+|------|-----------|-------|----------|
+| 4000 | `BadSignal` | Invalid signal format | Check signal parameters |
+| 4001 | `CallNotFound` | Call not found in system | Verify call ID exists |
+| 4002 | `ParticipantNotFound` | Participant not in call | Check participant exists |
+| 4003 | `NotAllowed` | Operation not allowed in state | Verify call state |
+| 4004 | `ParticipantAlreadyExists` | Participant already in call | Don't add duplicates |
+| 4005 | `NotAllowed` | Permission denied by user | Enable in browser settings |
+| 4006 | `BadRequest` | Invalid request parameters | Fix parameters |
+| 5001 | `InternalError` | Server-side error | Retry (resendable) |
+| 9901 | `NetworkError` | Network connectivity lost | Check connection (resendable) |
+| 9902 | `Timeout` | Operation timed out | Retry (resendable) |
+| 9903 | `NetworkError` | Network error occurred | Check connection (resendable) |
+| 9904 | `NetworkError` | Network error occurred | Check connection (resendable) |
 
 ## Call Events
 

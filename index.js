@@ -35,12 +35,12 @@
             setState(e, t, i) {
               return this.isValidStateTransition(e, t)
                 ? (a.info(
-                    `[25] [CallId: ${this.callId}] Call state transition for ${i}: ${t} -> ${e}`,
+                    `[25] [CallId: ${this.callId}] Call state changed ${t} -> ${e}, reason: ${i}`,
                     { color: "cyan" },
                   ),
                   !0)
                 : (a.warn(
-                    `[28] [CallId: ${this.callId}] Invalid CallState transition for ${i}: ${t} -> ${e}`,
+                    `[28] [CallId: ${this.callId}] Invalid CallState changed ${t} -> ${e}, reason: ${i}`,
                     { color: "red" },
                   ),
                   !1);
@@ -701,98 +701,173 @@
             a = i(645),
             l = i(185),
             r = i(297),
-            s = (0, a.createLogger)("CallClient");
-          class o extends r.TypedEventEmitter {
+            s = i(228),
+            o = i(65),
+            c = i(302),
+            d = i(578),
+            u = (0, a.createLogger)("CallClient");
+          class p extends r.TypedEventEmitter {
             constructor(e) {
               (super(),
-                (this.join = (e) => {
-                  s.info(`[20] [CallId: ${e.id || "new"}] Join call`, {
+                (this.join = (e, t) => {
+                  u.info(`[20] [CallId: ${e.id || "new"}] Join call`, {
                     color: "cyan",
                   });
                   try {
-                    const t = this.internalCallHandler.joinCall(e);
+                    const i = this.getCall(e.id);
+                    if (
+                      i &&
+                      !this.sendSignalValidator.canSendSignalEvent(
+                        d.SignalEvent.JOIN,
+                        i,
+                      )
+                    ) {
+                      const t = `Cannot join call with ID ${e.id || "new"} due to invalid call state or participant state.`;
+                      return (
+                        u.warn(`[25] [CallId: ${e.id || "new"}] ${t}`, {
+                          color: "red",
+                        }),
+                        {
+                          success: !1,
+                          error: o.SceytCallException.BadRequest(4006, t),
+                        }
+                      );
+                    }
+                    const n = this.internalCallHandler.joinCall(e, t);
                     return (
-                      t &&
-                        t.activeSpeakerManager.addParticipant(
-                          t.localParticipant,
-                        ),
-                      t
+                      (null == n ? void 0 : n.data) &&
+                        (null == n ||
+                          n.data.activeSpeakerManager.addParticipant(
+                            n.data.localParticipant,
+                          )),
+                      n
                     );
                   } catch (t) {
-                    throw (
-                      s.error(
+                    return (
+                      u.error(
                         `[29] [CallId: ${e.id || "new"}] Join failed: ${t.message || JSON.stringify(t)}`,
                         { color: "red" },
                       ),
-                      t
+                      { success: !1, error: (0, s.toCallException)(t) }
                     );
                   }
                 }),
-                (this.reject = (e, t) => {
-                  if (e)
-                    try {
-                      s.info(`[41] [CallId: ${e.id}] Rejecting call`, {
-                        color: "cyan",
-                      });
-                      const i = this.getCall(e.id);
-                      if (i) {
-                        const e = this.internalCallHandler.rejectCall(i, t);
-                        return (
-                          i.activeSpeakerManager.removeParticipant(
-                            i.localParticipant,
-                          ),
-                          e
-                        );
-                      }
-                      return;
-                    } catch (t) {
-                      throw (
-                        s.error(
-                          `[51] [CallId: ${e.id}] Rejection failed: ${t.message || JSON.stringify(t)}`,
-                          { color: "red" },
+                (this.reject = (e, t, i) => {
+                  if (!e)
+                    return (
+                      u.warn(
+                        "[39] [CallId: GLOBAL_LOGS] [REJECT] Attempted to reject a null call",
+                      ),
+                      {
+                        success: !1,
+                        error: o.SceytCallException.BadRequest(
+                          4006,
+                          "Call object is null",
                         ),
-                        t
+                      }
+                    );
+                  try {
+                    u.info(`[41] [CallId: ${e.id}] Rejecting call`, {
+                      color: "cyan",
+                    });
+                    const n = this.getCall(e.id);
+                    if (
+                      n &&
+                      !this.sendSignalValidator.canSendSignalEvent(
+                        d.SignalEvent.DECLINE,
+                        n,
+                      )
+                    ) {
+                      const t = `Cannot reject call with ID ${e.id} due to invalid call state or participant state.`;
+                      return (
+                        u.warn(`[45] [CallId: ${e.id}] ${t}`, { color: "red" }),
+                        {
+                          success: !1,
+                          error: o.SceytCallException.BadRequest(4006, t),
+                        }
                       );
                     }
-                  else
-                    s.warn(
-                      "[39] [CallId: GLOBAL_LOGS] [REJECT] Attempted to reject a null call",
+                    return n
+                      ? (this.internalCallHandler.rejectCall(n, t, i),
+                        n.activeSpeakerManager.removeParticipant(
+                          n.localParticipant,
+                        ),
+                        { success: !0 })
+                      : {
+                          success: !1,
+                          error: o.SceytCallException.BadRequest(
+                            4006,
+                            "Call not found",
+                          ),
+                        };
+                  } catch (t) {
+                    return (
+                      u.error(
+                        `[51] [CallId: ${e.id}] Rejection failed: ${t.message || JSON.stringify(t)}`,
+                        { color: "red" },
+                      ),
+                      { success: !1, error: (0, s.toCallException)(t) }
                     );
+                  }
                 }),
                 (this.leave = (e) => {
-                  if (e)
-                    try {
-                      s.info(`[62] [CallId: ${e.id}] Leaving call`, {
-                        color: "cyan",
-                      });
-                      const t = this.getCall(e.id);
-                      if (t) {
-                        const e = this.internalCallHandler.leaveCall(
-                          t,
-                          !0,
-                          "leave",
-                        );
-                        return (
-                          t.activeSpeakerManager.removeParticipant(
-                            t.localParticipant,
-                          ),
-                          e
-                        );
-                      }
-                      return;
-                    } catch (t) {
-                      throw (
-                        s.error(
-                          `[71] [CallId: ${null == e ? void 0 : e.id}] Leave failed: ${t.message || JSON.stringify(t)}`,
-                          { color: "red" },
+                  if (!e)
+                    return (
+                      u.warn(
+                        "[57] [CallId: GLOBAL_LOGS] [LEAVE] Attempted to leave a null call",
+                      ),
+                      {
+                        success: !1,
+                        error: o.SceytCallException.BadRequest(
+                          4006,
+                          "Call object is null",
                         ),
-                        t
+                      }
+                    );
+                  try {
+                    u.info(
+                      `[62] [CallId: ${null == e ? void 0 : e.id}] Leaving call`,
+                      { color: "cyan" },
+                    );
+                    const t = this.getCall(null == e ? void 0 : e.id);
+                    if (
+                      t &&
+                      !this.sendSignalValidator.canSendSignalEvent(
+                        d.SignalEvent.LEAVE,
+                        t,
+                      )
+                    ) {
+                      const t = `Cannot leave call with ID ${e.id} due to invalid call state or participant state.`;
+                      return (
+                        u.warn(`[66] [CallId: ${e.id}] ${t}`, { color: "red" }),
+                        {
+                          success: !1,
+                          error: o.SceytCallException.BadRequest(4006, t),
+                        }
                       );
                     }
-                  else
-                    s.warn(
-                      "[57] [CallId: GLOBAL_LOGS] [LEAVE] Attempted to leave a null call",
+                    return t
+                      ? (this.internalCallHandler.leaveCall(t, !0, "leave"),
+                        t.activeSpeakerManager.removeParticipant(
+                          t.localParticipant,
+                        ),
+                        { success: !0 })
+                      : {
+                          success: !1,
+                          error: o.SceytCallException.BadRequest(
+                            4006,
+                            "Call not found",
+                          ),
+                        };
+                  } catch (t) {
+                    return (
+                      u.error(
+                        `[71] [CallId: ${null == e ? void 0 : e.id}] Leave failed: ${t.message || JSON.stringify(t)}`,
+                        { color: "red" },
+                      ),
+                      { success: !1, error: (0, s.toCallException)(t) }
                     );
+                  }
                 }),
                 (this.getCall = (e) =>
                   this.internalCallHandler.activeCalls.find((t) => t.id === e)),
@@ -805,6 +880,7 @@
                   () => (0, a.removeLogListener)(e)
                 )),
                 (this.internalCallHandler = new n.InternalCallHandler(e)),
+                (this.sendSignalValidator = new c.SendSignalValidator()),
                 this.setupInternalEventBridge());
             }
             setupInternalEventBridge() {
@@ -825,7 +901,7 @@
               return l.RecentCallQueryBuilder;
             }
           }
-          t.SceytCallClient = o;
+          t.SceytCallClient = p;
         },
         998: function (e, t, i) {
           var n =
@@ -868,7 +944,8 @@
             s = i(645),
             o = i(258),
             c = i(297),
-            d = (0, s.createLogger)("Call");
+            d = i(228),
+            u = (0, s.createLogger)("Call");
           class p extends c.TypedEventEmitter {
             constructor({
               id: e,
@@ -878,8 +955,8 @@
               localParticipant: s,
               participants: c,
               metadata: p,
-              chatClient: u,
-              isCallSilenced: g,
+              chatClient: g,
+              isCallSilenced: h,
             }) {
               (super(),
                 (this.state = l.CallState.Idle),
@@ -890,39 +967,54 @@
                 (this.videoEnabled = !1),
                 (this.eventsQueue = new Map()),
                 (this.isCallSilenced = !1),
-                (this._onAudioTrackAdded = null),
-                (this._onVideoTrackAdded = null),
-                (this._onParticipantStateChanged = null),
-                (this._onParticipantConnectionStateChanged = null),
-                (this._onParticipantEvent = null),
-                (this._onCallStateChanged = null),
-                (this._onParticipantsAdded = null),
-                (this._onActiveSpeakersChanged = null),
-                (this._onDominantSpeakerChanged = null),
-                (this._onAudioTrackRemoved = null),
-                (this._onVideoTrackRemoved = null),
-                (this._onCallMediaFlowChanged = null),
                 (this.videoDeviceId = null),
                 (this.getStats = () =>
                   n(this, void 0, void 0, function* () {
-                    const e = [];
-                    for (const t of this.participants) {
-                      const i = yield this.getParticipantStats(t);
-                      i && e.push(i);
+                    try {
+                      const e = [];
+                      for (const t of this.participants) {
+                        const i = yield this.getParticipantStats(t);
+                        i.success && i.data && e.push(i.data);
+                      }
+                      return { success: !0, data: e };
+                    } catch (e) {
+                      return (
+                        u.error(
+                          `[502] [CallId: ${this.id}] Error getting call stats ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                          { color: "red" },
+                        ),
+                        { success: !1, error: (0, d.toCallException)(e) }
+                      );
                     }
-                    return e;
                   })),
                 (this.getParticipantStats = (e) =>
                   n(this, void 0, void 0, function* () {
-                    d.info(
-                      `[503] [CallId: ${this.id}] getParticipantStats for ${e.getFullId()}`,
-                      { color: "cyan" },
-                    );
-                    const t =
-                        a.InternalCallHandler.getInstance()
-                          .callParticipantsRTCMap[this.id],
-                      i = null == t ? void 0 : t[e.getFullId()];
-                    return i ? yield i.getConnectionStats() : null;
+                    try {
+                      u.info(
+                        `[503] [CallId: ${this.id}] getParticipantStats for ${e.getFullId()}`,
+                        { color: "cyan" },
+                      );
+                      const t =
+                          a.InternalCallHandler.getInstance()
+                            .callParticipantsRTCMap[this.id],
+                        i = null == t ? void 0 : t[e.getFullId()];
+                      return i
+                        ? { success: !0, data: yield i.getConnectionStats() }
+                        : {
+                            success: !1,
+                            error: (0, d.toCallException)(
+                              new Error("Participant RTC client not found"),
+                            ),
+                          };
+                    } catch (e) {
+                      return (
+                        u.error(
+                          `[504] [CallId: ${this.id}] Error getting participant stats ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                          { color: "red" },
+                        ),
+                        { success: !1, error: (0, d.toCallException)(e) }
+                      );
+                    }
                   })),
                 (this.id = e),
                 (this.sessionId = t),
@@ -932,123 +1024,75 @@
                 (this.mediaFlow = i),
                 (this.metadata = p),
                 (this.activeSpeakerManager = new o.ActiveSpeakerManager(this)),
-                (this.chatClient = u),
-                (this.isCallSilenced = g));
+                (this.chatClient = g),
+                (this.isCallSilenced = h));
             }
             emitAudioTrackAdded(e, t) {
-              var i;
-              (this.emit("audioTrackAdded", {
+              this.emit("audioTrackAdded", {
                 call: this,
                 participant: e,
                 track: t,
-              }),
-                null === (i = this._onAudioTrackAdded) ||
-                  void 0 === i ||
-                  i.call(this, this, e, t));
+              });
             }
             emitAudioTrackRemoved(e) {
-              var t;
-              (this.emit("audioTrackRemoved", { call: this, participant: e }),
-                null === (t = this._onAudioTrackRemoved) ||
-                  void 0 === t ||
-                  t.call(this, this, e));
+              this.emit("audioTrackRemoved", { call: this, participant: e });
             }
             emitVideoTrackAdded(e, t) {
-              var i;
-              (this.emit("videoTrackAdded", {
+              this.emit("videoTrackAdded", {
                 call: this,
                 participant: e,
                 track: t,
-              }),
-                null === (i = this._onVideoTrackAdded) ||
-                  void 0 === i ||
-                  i.call(this, this, e, t));
+              });
             }
             emitVideoTrackRemoved(e) {
-              var t;
-              (this.emit("videoTrackRemoved", { call: this, participant: e }),
-                null === (t = this._onVideoTrackRemoved) ||
-                  void 0 === t ||
-                  t.call(this, this, e));
+              this.emit("videoTrackRemoved", { call: this, participant: e });
             }
             emitCallStateChanged(e) {
-              var t;
-              (this.emit("callStateChanged", { call: this, state: e }),
-                null === (t = this._onCallStateChanged) ||
-                  void 0 === t ||
-                  t.call(this, this, e));
+              this.emit("callStateChanged", { call: this, state: e });
             }
             emitParticipantStateChanged(e, t, i) {
-              var n;
-              (this.emit("participantStateChanged", {
+              this.emit("participantStateChanged", {
                 call: this,
                 participant: e,
                 state: t,
                 reason: i,
-              }),
-                null === (n = this._onParticipantStateChanged) ||
-                  void 0 === n ||
-                  n.call(this, this, e, t, i));
+              });
             }
             emitParticipantConnectionStateChanged(e, t) {
-              var i;
-              (this.emit("participantConnectionStateChanged", {
+              this.emit("participantConnectionStateChanged", {
                 call: this,
                 participant: e,
                 state: t,
-              }),
-                null === (i = this._onParticipantConnectionStateChanged) ||
-                  void 0 === i ||
-                  i.call(this, this, e, t));
+              });
             }
             emitParticipantEvent(e, t) {
-              var i;
-              (this.emit("participantEvent", {
+              this.emit("participantEvent", {
                 call: this,
                 participant: e,
                 event: t,
-              }),
-                null === (i = this._onParticipantEvent) ||
-                  void 0 === i ||
-                  i.call(this, this, e, t));
+              });
             }
             emitParticipantsAdded(e, t) {
-              var i;
-              (this.emit("participantsAdded", {
+              this.emit("participantsAdded", {
                 call: this,
                 participants: e,
                 entryType: t,
-              }),
-                null === (i = this._onParticipantsAdded) ||
-                  void 0 === i ||
-                  i.call(this, this, e, t));
+              });
             }
             emitActiveSpeakersChanged(e) {
-              var t;
-              (this.emit("activeSpeakersChanged", {
+              this.emit("activeSpeakersChanged", {
                 call: this,
                 activeSpeakers: e,
-              }),
-                null === (t = this._onActiveSpeakersChanged) ||
-                  void 0 === t ||
-                  t.call(this, this, e));
+              });
             }
             emitDominantSpeakerChanged(e) {
-              var t;
-              (this.emit("dominantSpeakerChanged", {
+              this.emit("dominantSpeakerChanged", {
                 call: this,
                 dominantSpeaker: e,
-              }),
-                null === (t = this._onDominantSpeakerChanged) ||
-                  void 0 === t ||
-                  t.call(this, this, e));
+              });
             }
             emitMediaFlowChanged(e) {
-              var t;
-              (this.emit("mediaFlowChanged", { call: this, mediaFlow: e }),
-                null === (t = this._onCallMediaFlowChanged) ||
-                  void 0 === t ||
-                  t.call(this, this, e));
+              this.emit("mediaFlowChanged", { call: this, mediaFlow: e });
             }
             clearEventsQueue() {
               this.eventsQueue.clear();
@@ -1072,16 +1116,17 @@
               );
             }
             addParticipants(e) {
-              return n(this, void 0, void 0, function* () {
-                const t = (e) =>
-                  a.InternalCallHandler.getInstance().addParticipantsToCall(
-                    e,
-                    this,
-                  );
+              const t = (e) =>
+                a.InternalCallHandler.getInstance().addParticipantsToCall(
+                  e,
+                  this,
+                );
+              return (
                 this.sessionId
                   ? t(e)
-                  : this.eventsQueue.set("ADD_PARTICIPANTS", () => t(e));
-              });
+                  : this.eventsQueue.set("ADD_PARTICIPANTS", () => t(e)),
+                { success: !0 }
+              );
             }
             addParticipantToList(e) {
               this.participants.push(e);
@@ -1101,46 +1146,56 @@
               this.mediaFlow != e &&
                 ((this.mediaFlow = e), this.emitMediaFlowChanged(e));
             }
-            switchToSFU() {
+            switchToSFU(e) {
               return n(this, void 0, void 0, function* () {
-                const e = (e) => {
-                  d.info(
+                const t = (t) => {
+                  u.info(
                     `[159] [CallId: ${this.id}] handle switch call to ${l.MediaFlow.SFU}`,
                     { color: "cyan" },
                   );
-                  const t = a.InternalCallHandler.getInstance(),
-                    i = t.activeCalls.find((t) => t.id === e);
-                  t.switchCallToSfu(i);
+                  const i = a.InternalCallHandler.getInstance(),
+                    n = i.activeCalls.find((e) => e.id === t);
+                  return i.switchCallToSfu(n, e);
                 };
-                this.sessionId
-                  ? e(this.id)
-                  : this.eventsQueue.set(l.SignalEvent.SWITCH_MEDIA_FLOW, () =>
-                      e(this.id),
-                    );
+                return (
+                  this.sessionId
+                    ? t(this.id)
+                    : this.eventsQueue.set(
+                        l.SignalEvent.SWITCH_MEDIA_FLOW,
+                        () => t(this.id),
+                      ),
+                  { success: !0 }
+                );
               });
             }
-            mute(e) {
+            mute(e, t) {
               ((this.muted = e),
                 this.localParticipant.setMuted(e),
                 this.emitParticipantEvent(
                   this.localParticipant,
                   e ? "Mute" : "Unmute",
                 ));
-              const t = (e) => {
-                a.InternalCallHandler.getInstance().sendAudioEnable(this, e);
+              const i = (e) => {
+                a.InternalCallHandler.getInstance().sendAudioEnable(this, e, t);
               };
-              this.sessionId
-                ? t(e)
-                : this.eventsQueue.set(l.SignalEvent.MUTE, () => t(e));
+              return (
+                this.sessionId
+                  ? i(e)
+                  : this.eventsQueue.set(l.SignalEvent.MUTE, () => i(e)),
+                { success: !0 }
+              );
             }
             hold(e) {
               this.onHold = e;
               const t = (e) => {
                 a.InternalCallHandler.getInstance().sendHold(this, e);
               };
-              this.sessionId
-                ? t(e)
-                : this.eventsQueue.set(l.SignalEvent.HOLD, () => t(e));
+              return (
+                this.sessionId
+                  ? t(e)
+                  : this.eventsQueue.set(l.SignalEvent.HOLD, () => t(e)),
+                { success: !0 }
+              );
             }
             set localAudioTracks(e) {
               this._localAudioTracks = e;
@@ -1175,174 +1230,316 @@
             getIsCallSilenced() {
               return this.isCallSilenced;
             }
-            enableVideo(e) {
-              var t, i;
+            setVideoDeviceId(e) {
+              this.videoDeviceId = e;
+            }
+            getVideoDeviceId() {
+              return this.videoDeviceId;
+            }
+            enableVideo(e, t, i) {
               return n(this, void 0, void 0, function* () {
-                const n = a.InternalCallHandler.getInstance();
-                let r = [];
-                if (
-                  (this.localVideoTracks.forEach((e) => {
+                const r = a.InternalCallHandler.getInstance();
+                let s = [];
+                return (
+                  this.localVideoTracks.forEach((e) => {
                     e.stop();
                   }),
-                  e)
-                ) {
-                  const e = yield navigator.mediaDevices.getUserMedia({
-                    video: {
-                      width: { min: 640, max: 1280 },
-                      height: { min: 480, max: 720 },
-                    },
-                  });
-                  ((r = e.getVideoTracks()),
-                    r.sort((e, t) =>
-                      (e.getSettings().deviceId || "") === this.videoDeviceId
-                        ? -1
-                        : 1,
-                    ),
-                    (this.videoDeviceId =
-                      (null === (t = r[0]) || void 0 === t
-                        ? void 0
-                        : t.getSettings().deviceId) || null));
-                } else r = this.localVideoTracks;
-                (!this.videoDeviceId &&
-                  r.length > 0 &&
-                  (this.videoDeviceId =
-                    (null === (i = r[0]) || void 0 === i
-                      ? void 0
-                      : i.getSettings().deviceId) || null),
-                  (this.localVideoTracks = r),
-                  this.localParticipant.setVideoTracks(r),
-                  (this.localParticipant.videoEnabled = e),
-                  this.emitVideoTrackAdded(this.localParticipant, r[0]),
-                  this.emitParticipantEvent(
-                    this.localParticipant,
-                    e ? "VideoEnabled" : "VideoDisabled",
-                  ),
-                  this.localParticipant.videoTracks.forEach((t) => {
-                    t.enabled = e;
-                  }));
-                const s = (e, t) => {
-                  (n.changeVideoTracks(this, t, e),
-                    n.sendVideoEnabled(this, e));
-                };
-                this.sessionId
-                  ? s(e, r[0])
-                  : this.eventsQueue.set(
-                      e ? l.SignalEvent.VIDEO_ON : l.SignalEvent.VIDEO_OFF,
-                      () => s(e, r[0]),
-                    );
+                  this.localParticipant.videoTracks.forEach((e) => {
+                    e.enabled = !1;
+                  }),
+                  yield (() =>
+                    n(this, void 0, void 0, function* () {
+                      var a, o, c;
+                      try {
+                        if (e) {
+                          const e =
+                            (yield navigator.mediaDevices.enumerateDevices()).filter(
+                              (e) => "videoinput" === e.kind,
+                            );
+                          this.videoDeviceId &&
+                            (e.some((e) => e.deviceId === this.videoDeviceId) ||
+                              (u.warn(
+                                `Previously selected video device with ID ${this.videoDeviceId} not found. Falling back to default camera.`,
+                              ),
+                              this.setVideoDeviceId(null)));
+                          const t = yield navigator.mediaDevices.getUserMedia({
+                            video: {
+                              deviceId: this.videoDeviceId
+                                ? { exact: this.videoDeviceId }
+                                : void 0,
+                              width: { min: 640, max: 1280 },
+                              height: { min: 480, max: 720 },
+                            },
+                          });
+                          ((s = t.getVideoTracks()),
+                            s.sort((e, t) =>
+                              (e.getSettings().deviceId || "") ===
+                              this.videoDeviceId
+                                ? -1
+                                : 1,
+                            ),
+                            this.setVideoDeviceId(
+                              (null === (a = s[0]) || void 0 === a
+                                ? void 0
+                                : a.getSettings().deviceId) || null,
+                            ));
+                        } else s = this.localVideoTracks;
+                        (!this.videoDeviceId &&
+                          s.length > 0 &&
+                          this.setVideoDeviceId(
+                            (null === (o = s[0]) || void 0 === o
+                              ? void 0
+                              : o.getSettings().deviceId) || null,
+                          ),
+                          (this.localVideoTracks = s),
+                          this.localParticipant.setVideoTracks(s),
+                          (this.localParticipant.videoEnabled = e),
+                          this.emitVideoTrackAdded(this.localParticipant, s[0]),
+                          this.emitParticipantEvent(
+                            this.localParticipant,
+                            e ? "VideoEnabled" : "VideoDisabled",
+                          ),
+                          this.localParticipant.videoTracks.forEach((t) => {
+                            t.enabled = e;
+                          }),
+                          this.localVideoTracks &&
+                            (null === (c = this.localVideoTracks) ||
+                            void 0 === c
+                              ? void 0
+                              : c.length) &&
+                            (yield r.changeVideoTracks(
+                              this,
+                              this.localVideoTracks[0],
+                              e,
+                            )));
+                        const p = (e, i) =>
+                          n(this, void 0, void 0, function* () {
+                            try {
+                              (yield r.changeVideoTracks(this, i, e),
+                                r.sendVideoEnabled(this, e, t));
+                            } catch (e) {
+                              return (
+                                u.error(
+                                  `[323] [CallId: ${this.id}] Failed to send video enabled signal: message: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                                  { color: "red" },
+                                ),
+                                void (
+                                  null == t ||
+                                  t({ error: (0, d.toCallException)(e) })
+                                )
+                              );
+                            }
+                          });
+                        i ||
+                          (this.sessionId
+                            ? p(e, s[0])
+                            : this.eventsQueue.set(
+                                e
+                                  ? l.SignalEvent.VIDEO_ON
+                                  : l.SignalEvent.VIDEO_OFF,
+                                () => p(e, s[0]),
+                              ));
+                      } catch (e) {
+                        return (
+                          u.error(
+                            `[325] [CallId: ${this.id}] Error enabling video ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                            { color: "red" },
+                          ),
+                          { success: !1, error: (0, d.toCallException)(e) }
+                        );
+                      }
+                    }))(),
+                  { success: !0 }
+                );
               });
             }
-            shareScreen(e) {
+            shareScreen(e, t) {
               return n(this, void 0, void 0, function* () {
-                let t = [];
+                let i = [];
                 try {
-                  if (e) {
-                    const e = yield navigator.mediaDevices.getDisplayMedia({
+                  if ((this.localParticipant.setScreenSharing(e), e)) {
+                    const t = yield navigator.mediaDevices.getDisplayMedia({
                       video: {
                         width: { max: 1280 },
                         height: { max: 720 },
                         frameRate: { max: 30 },
                       },
                     });
-                    ((t = e.getVideoTracks()),
-                      e.addEventListener("inactive", () => {
-                        this.stopScreenShare();
-                      }));
-                  } else
-                    this.localParticipant.videoEnabled && this.enableVideo(!0);
-                  (this.localVideoTracks.forEach((e) => {
-                    e.stop();
-                  }),
-                    (this.localVideoTracks = t),
-                    this.localParticipant.setVideoTracks(t),
-                    this.localParticipant.setScreenSharing(e),
-                    this.emitVideoTrackAdded(this.localParticipant, t[0]),
+                    if (
+                      (this.localVideoTracks.forEach((e) => {
+                        e.stop();
+                      }),
+                      (i = t.getVideoTracks()),
+                      t.addEventListener("inactive", () => {
+                        this.localParticipant.screenSharing &&
+                          this.stopScreenShare();
+                      }),
+                      (this.localVideoTracks = i),
+                      this.localParticipant.setVideoTracks(i),
+                      this.emitVideoTrackAdded(this.localParticipant, i[0]),
+                      this.localParticipant.videoTracks.forEach((t) => {
+                        t.enabled = e;
+                      }),
+                      i && i.length)
+                    ) {
+                      const t = a.InternalCallHandler.getInstance();
+                      yield t.changeVideoTracks(this, i[0], e, !0);
+                    }
                     this.emitParticipantEvent(
                       this.localParticipant,
-                      e ? "ScreenSharingStarted" : "ScreenSharingStopped",
-                    ),
-                    this.localParticipant.videoTracks.forEach((t) => {
-                      t.enabled = e;
-                    }));
-                  const i = (e, t) => {
-                    a.InternalCallHandler.getInstance().sendScreenShare(
-                      this,
-                      e,
-                      t,
+                      "ScreenSharingStarted",
                     );
-                  };
-                  this.sessionId
-                    ? i(e, t[0])
-                    : this.eventsQueue.set(
-                        e
-                          ? l.SignalEvent.SCREEN_SHARE_ON
-                          : l.SignalEvent.SCREEN_SHARE_OFF,
-                        () => i(e, t[0]),
-                      );
+                  } else
+                    this.localParticipant.videoEnabled && !e
+                      ? (this.emitParticipantEvent(
+                          this.localParticipant,
+                          "ScreenSharingStopped",
+                        ),
+                        yield this.enableVideo(!0, t, !0))
+                      : this.emitParticipantEvent(
+                          this.localParticipant,
+                          e ? "ScreenSharingStarted" : "ScreenSharingStopped",
+                        );
+                  const r = (e) =>
+                    n(this, void 0, void 0, function* () {
+                      const i = a.InternalCallHandler.getInstance();
+                      yield i.sendScreenShare(this, e, t);
+                    });
+                  return (
+                    this.sessionId
+                      ? r(e)
+                      : this.eventsQueue.set(
+                          e
+                            ? l.SignalEvent.SCREEN_SHARE_ON
+                            : l.SignalEvent.SCREEN_SHARE_OFF,
+                          () => r(e),
+                        ),
+                    { success: !0 }
+                  );
                 } catch (e) {
-                  d.error(
-                    `[324] [CallId: ${this.id}] Error sharing screen ${e instanceof Error ? e.message : JSON.stringify(e)}`,
-                    { color: "red" },
+                  return (
+                    u.error(
+                      `[324] [CallId: ${this.id}] Error sharing screen ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                      { color: "red" },
+                    ),
+                    { success: !1, error: (0, d.toCallException)(e) }
                   );
                 }
               });
             }
-            startScreenShare() {
+            startScreenShare(e) {
               return n(this, void 0, void 0, function* () {
-                return this.shareScreen(!0);
+                return this.shareScreen(!0, e);
               });
             }
-            stopScreenShare() {
+            stopScreenShare(e) {
               return n(this, void 0, void 0, function* () {
-                return this.shareScreen(!1);
+                return yield this.shareScreen(!1, e);
               });
             }
             getAvailableVideoDevices() {
               return n(this, void 0, void 0, function* () {
-                return (yield navigator.mediaDevices.enumerateDevices()).filter(
-                  (e) => "videoinput" === e.kind,
-                );
+                try {
+                  return {
+                    success: !0,
+                    data: (yield navigator.mediaDevices.enumerateDevices()).filter(
+                      (e) => "videoinput" === e.kind,
+                    ),
+                  };
+                } catch (e) {
+                  return (
+                    u.error(
+                      `[306] [CallId: ${this.id}] Error getting video devices ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                      { color: "red" },
+                    ),
+                    { success: !1, error: (0, d.toCallException)(e) }
+                  );
+                }
               });
             }
             getAvailableAudioDevices() {
               return n(this, void 0, void 0, function* () {
-                return (yield navigator.mediaDevices.enumerateDevices()).filter(
-                  (e) => "audioinput" === e.kind,
-                );
+                try {
+                  return {
+                    success: !0,
+                    data: (yield navigator.mediaDevices.enumerateDevices()).filter(
+                      (e) => "audioinput" === e.kind,
+                    ),
+                  };
+                } catch (e) {
+                  return (
+                    u.error(
+                      `[307] [CallId: ${this.id}] Error getting audio devices ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                      { color: "red" },
+                    ),
+                    { success: !1, error: (0, d.toCallException)(e) }
+                  );
+                }
               });
             }
             selectVideoDevice(e) {
               return n(this, void 0, void 0, function* () {
-                ((this.videoDeviceId = e),
-                  this.localVideoTracks.forEach((e) => {
-                    e.stop();
-                  }));
-                const t = (yield navigator.mediaDevices.getUserMedia({
-                  video: {
-                    deviceId: { exact: e },
-                    width: { min: 640, max: 1280 },
-                    height: { min: 480, max: 720 },
-                  },
-                })).getVideoTracks();
-                ((this.localVideoTracks = t),
-                  this.localParticipant.setVideoTracks(t),
-                  this.emitVideoTrackAdded(this.localParticipant, t[0]),
-                  a.InternalCallHandler.getInstance().changeVideoTracks(
-                    this,
-                    t[0],
-                    this.localParticipant.videoEnabled,
-                  ));
+                try {
+                  (this.setVideoDeviceId(e),
+                    this.localVideoTracks.forEach((e) => {
+                      e.stop();
+                    }));
+                  const t = (yield navigator.mediaDevices.getUserMedia({
+                    video: {
+                      deviceId: { exact: e },
+                      width: { min: 640, max: 1280 },
+                      height: { min: 480, max: 720 },
+                    },
+                  })).getVideoTracks();
+                  ((this.localVideoTracks = t),
+                    this.localParticipant.setVideoTracks(t),
+                    this.emitVideoTrackAdded(this.localParticipant, t[0]));
+                  const i = a.InternalCallHandler.getInstance();
+                  return (
+                    yield i.changeVideoTracks(
+                      this,
+                      t[0],
+                      this.localParticipant.videoEnabled,
+                    ),
+                    { success: !0 }
+                  );
+                } catch (e) {
+                  return (
+                    u.error(
+                      `[308] [CallId: ${this.id}] Error selecting video device ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                      { color: "red" },
+                    ),
+                    { success: !1, error: (0, d.toCallException)(e) }
+                  );
+                }
               });
             }
             selectAudioDevice(e) {
               return n(this, void 0, void 0, function* () {
-                const t = a.InternalCallHandler.getInstance(),
-                  i = (yield navigator.mediaDevices.getUserMedia({
-                    audio: { deviceId: { exact: e } },
-                  })).getAudioTracks();
-                ((this.localAudioTracks = i),
-                  this.localParticipant.setAudioTracks(i),
-                  t.changeAudioTracks(this, i[0], this.localParticipant.muted));
+                try {
+                  const t = a.InternalCallHandler.getInstance(),
+                    i = (yield navigator.mediaDevices.getUserMedia({
+                      audio: { deviceId: { exact: e } },
+                    })).getAudioTracks();
+                  return (
+                    (this.localAudioTracks = i),
+                    this.localParticipant.setAudioTracks(i),
+                    yield t.changeAudioTracks(
+                      this,
+                      i[0],
+                      this.localParticipant.muted,
+                    ),
+                    { success: !0 }
+                  );
+                } catch (e) {
+                  return (
+                    u.error(
+                      `[309] [CallId: ${this.id}] Error selecting audio device ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                      { color: "red" },
+                    ),
+                    { success: !1, error: (0, d.toCallException)(e) }
+                  );
+                }
               });
             }
             setVideoEnabled(e) {
@@ -1353,8 +1550,8 @@
                 (i) => i.id === e && i.clientId === t,
               );
             }
-            sendRinging() {
-              return a.InternalCallHandler.getInstance().sendRinging(this);
+            sendRinging(e) {
+              return a.InternalCallHandler.getInstance().sendRinging(this, e);
             }
             toJson() {
               return {
@@ -1406,6 +1603,8 @@
                 return n.SceytCallException.NetworkError(e, t);
               case 9902:
                 return n.SceytCallException.Timeout(e, t);
+              case 4006:
+                return n.SceytCallException.BadRequest(e, t);
               default:
                 return n.SceytCallException.Unknown(e, t);
             }
@@ -1467,25 +1666,14 @@
               const n = new i(t, e, "Timeout");
               return ((n._isResendable = !0), n);
             }
+            static BadRequest(e, t) {
+              return new i(t, e, "BadRequest");
+            }
             static Unknown(e, t) {
               return new i(t, e);
             }
           }
           t.SceytCallException = i;
-        },
-        681: (e, t) => {
-          (Object.defineProperty(t, "__esModule", { value: !0 }),
-            (t.SceytChatError = void 0));
-          class i extends Error {
-            constructor(e, t, i, n) {
-              (super(e),
-                (this.type = i),
-                (this.code = t),
-                (this.traceId = n),
-                (this.name = "SceytCallError"));
-            }
-          }
-          t.SceytChatError = i;
         },
         650: function (e, t, i) {
           var n =
@@ -1529,11 +1717,12 @@
             o = i(998),
             c = i(489),
             d = i(645),
-            p = i(429),
-            u = i(65),
+            u = i(429),
+            p = i(65),
             g = i(680),
-            h = (0, d.createLogger)("InternalCallHandler");
-          class S {
+            h = i(228),
+            S = (0, d.createLogger)("InternalCallHandler");
+          class C {
             constructor(e) {
               ((this.callParticipantsRTCMap = {}),
                 (this.activeCalls = []),
@@ -1568,16 +1757,16 @@
                           (null == i ? void 0 : i.shouldResetPeerConnection)))
                     ) {
                       const e = (e) => {
-                        e instanceof u.SceytCallException || e instanceof Error
-                          ? h.error(
-                              `[968] [CallId: ${t.id}] SYNC CONNECT failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                        e instanceof p.SceytCallException || e instanceof Error
+                          ? S.error(
+                              `[968] [CallId: ${t.id}] SYNC CONNECT failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                             )
-                          : e.event === s.SignalEvent.ERROR &&
-                            h.error(
+                          : e.event !== s.SignalEvent.ERROR ||
+                            S.error(
                               `[971] [CallId: ${t.id}] SYNC CONNECT failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                             );
                       };
-                      (h.info(
+                      (S.info(
                         `[975] [CallId: ${t.id}] SYNC CONNECT to participant ${i.getFullId()}`,
                         { color: "blue" },
                       ),
@@ -1602,7 +1791,7 @@
                   var n, a;
                   if (i.mediaFlow !== s.MediaFlow.SFU)
                     if (
-                      (h.info(
+                      (S.info(
                         `[996] [CallId: ${i.id}] onIceCandidate, participantID: ${e.getFullId()}, candidate: ${null === (n = t.candidate) || void 0 === n ? void 0 : n.candidate}, type: ${null === (a = t.candidate) || void 0 === a ? void 0 : a.type}`,
                         { color: "blue" },
                       ),
@@ -1625,13 +1814,13 @@
                       };
                       try {
                         const t = (e) => {
-                          e instanceof u.SceytCallException ||
+                          e instanceof p.SceytCallException ||
                           e instanceof Error
-                            ? h.error(
-                                `[1007] [CallId: ${i.id}] SYNC ICE failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                            ? S.error(
+                                `[1007] [CallId: ${i.id}] SYNC ICE failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                               )
-                            : e.event === s.SignalEvent.ERROR &&
-                              h.error(
+                            : e.event !== s.SignalEvent.ERROR ||
+                              S.error(
                                 `[1011] [CallId: ${i.id}] SYNC ICE failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                               );
                         };
@@ -1647,24 +1836,24 @@
                           t,
                         );
                       } catch (t) {
-                        h.error(
+                        S.error(
                           `[1023] [CallId: ${i.id}] Failed to send ICE candidate to ${e.getFullId()}: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
                         );
                       }
                     } else
-                      h.info(
+                      S.info(
                         `[1025] [CallId: ${i.id}] ICE gathering complete for participant ${e.getFullId()} (null candidate)`,
                         { color: "blue" },
                       );
                   else
-                    h.info(
+                    S.info(
                       `[1024] [CallId: ${i.id}] onIceCandidate, participantID: ${e.getFullId()}, skip for SFU`,
                       { color: "blue" },
                     );
                 }),
                 (this.onTrack = (e, t, i) => {
                   const n = null == i ? void 0 : i.track;
-                  (h.info(
+                  (S.info(
                     `[1032] [CallId: ${e.id}] onTrack, participantID: ${t.getFullId()}, kind: ${n.kind}`,
                     { color: "blue" },
                   ),
@@ -1672,7 +1861,7 @@
                       ? (t.setAudioTracks([n]),
                         e.emitAudioTrackAdded(t, n),
                         (n.onended = () => {
-                          (h.info(
+                          (S.info(
                             `[1038] [CallId: ${e.id}] Audio track ended for participant ${t.getFullId()}`,
                             { color: "yellow" },
                           ),
@@ -1686,7 +1875,7 @@
                           e.setVideoEnabled(!0),
                         e.emitVideoTrackAdded(t, n),
                         (n.onended = () => {
-                          (h.info(
+                          (S.info(
                             `[1052] [CallId: ${e.id}] Video track ended for participant ${t.getFullId()}`,
                             { color: "yellow" },
                           ),
@@ -1731,20 +1920,20 @@
                             ));
                         }
                       }),
-                      h.info(
+                      S.info(
                         `[1547] [CallId: ${t.id}] added participants to call: ${e}, callId: ${t.id}`,
                         { color: "light-green" },
                       ),
                       e.length > 0)
                     ) {
                       const i = (e) => {
-                        e instanceof u.SceytCallException || e instanceof Error
-                          ? h.error(
-                              `[1551] [CallId: ${t.id}] SYNC INVITE failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                        e instanceof p.SceytCallException || e instanceof Error
+                          ? S.error(
+                              `[1551] [CallId: ${t.id}] SYNC INVITE failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                               { color: "red" },
                             )
-                          : e.event === s.SignalEvent.ERROR &&
-                            h.error(
+                          : e.event !== s.SignalEvent.ERROR ||
+                            S.error(
                               `[1555] [CallId: ${t.id}] SYNC INVITE failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                               { color: "red" },
                             );
@@ -1767,7 +1956,7 @@
                     return !1;
                   } catch (i) {
                     return (
-                      h.error(
+                      S.error(
                         `[1567] [CallId: ${t.id}] Failed to add participants to call: ${e}, callId: ${t.id} message: ${i instanceof Error ? i.message : JSON.stringify(i)}`,
                         { color: "red" },
                       ),
@@ -1775,18 +1964,25 @@
                     );
                   }
                 }),
-                (this.sendSignalScreenShare = (e, t) => {
+                (this.sendSignalScreenShare = (e, t, i) => {
                   try {
-                    const i = (t) => {
-                      t instanceof u.SceytCallException || t instanceof Error
-                        ? h.error(
-                            `[1679] [CallId: ${e.id}] SYNC SCREEN_SHARE_ON failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
-                          )
-                        : t.event === s.SignalEvent.ERROR &&
-                          h.error(
-                            `[1683] [CallId: ${e.id}] SYNC SCREEN_SHARE_ON failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
-                          );
-                    };
+                    const n = (t) =>
+                      t instanceof p.SceytCallException || t instanceof Error
+                        ? (S.error(
+                            `[1679] [CallId: ${e.id}] SYNC SCREEN_SHARE_ON failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
+                          ),
+                          void (
+                            null == i || i({ error: (0, h.toCallException)(t) })
+                          ))
+                        : t.event === s.SignalEvent.ERROR
+                          ? (S.error(
+                              `[1683] [CallId: ${e.id}] SYNC SCREEN_SHARE_ON failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
+                            ),
+                            void (
+                              null == i ||
+                              i({ error: (0, h.toCallException)(t.error) })
+                            ))
+                          : void 0;
                     return (
                       this.signalingClient.sendSignalMessage(
                         {
@@ -1797,16 +1993,17 @@
                             : s.SignalEvent.SCREEN_SHARE_OFF,
                           sessionId: e.sessionId,
                         },
-                        i,
+                        n,
                       ),
                       !0
                     );
                   } catch (t) {
                     return (
-                      h.error(
+                      S.error(
                         `[1694] [CallId: ${e.id}] Failed to send screen share signal: message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
                         { color: "red" },
                       ),
+                      null == i || i({ error: (0, h.toCallException)(t) }),
                       !1
                     );
                   }
@@ -1830,10 +2027,10 @@
                       );
                     } catch (t) {
                       throw (
-                        h.error(
+                        S.error(
                           `[1945] [CallId: ${e.id}] Failed to get media: message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
                         ),
-                        t
+                        (0, h.toCallException)(t)
                       );
                     }
                   })),
@@ -1848,7 +2045,7 @@
               if (
                 ((t.onConnectionStateChanged = (e) => {
                   if (
-                    (h.info(
+                    (S.info(
                       `[46] [CallId: GLOBAL_LOGS] Signaling connection state changed: ${e}`,
                       { color: "cyan" },
                     ),
@@ -1862,15 +2059,15 @@
                       (this.signalingClient.sendSignalMessage(
                         { event: s.SignalEvent.GET_CALL, callId: "" },
                         (e) => {
-                          e instanceof u.SceytCallException ||
+                          e instanceof p.SceytCallException ||
                           e instanceof Error
-                            ? h.error(
-                                `[57] [CallId: GLOBAL_LOGS] SYNC GET_CALL signal sent failed ${e instanceof u.SceytCallException || e instanceof Error ? e.message : JSON.stringify(e)}`,
+                            ? S.error(
+                                `[57] [CallId: GLOBAL_LOGS] SYNC GET_CALL signal sent failed ${e instanceof p.SceytCallException || e instanceof Error ? e.message : JSON.stringify(e)}`,
                                 { color: "red" },
                               )
                             : e.event !== s.SignalEvent.ERROR
                               ? this.syncActiveCalls(e)
-                              : h.error(
+                              : S.error(
                                   "[63] [CallId: GLOBAL_LOGS] SYNC GET_CALL signal sent failed message: " +
                                     (e.error
                                       ? `${e.error.message} code: ${e.error.code}`
@@ -1891,14 +2088,14 @@
                   (this.signalingClient.sendSignalMessage(
                     { event: s.SignalEvent.GET_CALL, callId: "" },
                     (e) => {
-                      e instanceof u.SceytCallException || e instanceof Error
-                        ? h.error(
-                            `[74] [CallId: GLOBAL_LOGS] SYNC GET_CALL signal sent failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                      e instanceof p.SceytCallException || e instanceof Error
+                        ? S.error(
+                            `[74] [CallId: GLOBAL_LOGS] SYNC GET_CALL signal sent failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                             { color: "red" },
                           )
                         : e.event !== s.SignalEvent.ERROR
                           ? this.syncActiveCalls(e)
-                          : h.error(
+                          : S.error(
                               "[77] [CallId: GLOBAL_LOGS] SYNC GET_CALL signal sent failed message: " +
                                 (e.error
                                   ? `${e.error.message} code: ${e.error.code}`
@@ -1911,7 +2108,7 @@
                     clearTimeout(e));
                 }, 1e3);
               }
-              S.instance = this;
+              C.instance = this;
             }
             syncActiveCalls(e) {
               var t, i, n;
@@ -1923,7 +2120,7 @@
                 )
                   return;
                 if (e.event !== s.SignalEvent.SUCCESS)
-                  return void h.error(
+                  return void S.error(
                     "[98] [CallId: GLOBAL_LOGS] Failed to get call information after reconnection message: " +
                       (e.error
                         ? `${e.error.message} code: ${e.error.code}`
@@ -1932,7 +2129,7 @@
                   );
                 for (const r of l) {
                   if (!(null == r ? void 0 : r.sessionId)) {
-                    h.warn(
+                    S.warn(
                       `[105] [CallId: ${r.id}] Call has no sessionId, skipping`,
                     );
                     continue;
@@ -1962,14 +2159,14 @@
                           e.clientId !== r.localParticipant.clientId
                         ) {
                           const e = (e) => {
-                            e instanceof u.SceytCallException ||
+                            e instanceof p.SceytCallException ||
                             e instanceof Error
-                              ? h.error(
-                                  `[139] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                              ? S.error(
+                                  `[139] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                                   { color: "red" },
                                 )
-                              : e.event === s.SignalEvent.ERROR &&
-                                h.error(
+                              : e.event !== s.SignalEvent.ERROR ||
+                                S.error(
                                   `[143] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                                   { color: "red" },
                                 );
@@ -1994,14 +2191,14 @@
                         r.state === s.CallState.Connected
                       ) {
                         const e = (e) => {
-                          e instanceof u.SceytCallException ||
+                          e instanceof p.SceytCallException ||
                           e instanceof Error
-                            ? h.error(
-                                `[158] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                            ? S.error(
+                                `[158] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                                 { color: "red" },
                               )
-                            : e.event === s.SignalEvent.ERROR &&
-                              h.error(
+                            : e.event !== s.SignalEvent.ERROR ||
+                              S.error(
                                 `[162] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                                 { color: "red" },
                               );
@@ -2033,19 +2230,19 @@
                           r.state === s.CallState.Connected
                         ) {
                           const e = (e) => {
-                            e instanceof u.SceytCallException ||
+                            e instanceof p.SceytCallException ||
                             e instanceof Error
-                              ? h.error(
-                                  `[199] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                              ? S.error(
+                                  `[199] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                                   { color: "red" },
                                 )
-                              : e.event === s.SignalEvent.ERROR &&
-                                h.error(
+                              : e.event !== s.SignalEvent.ERROR ||
+                                S.error(
                                   `[203] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                                   { color: "red" },
                                 );
                           };
-                          (h.info(
+                          (S.info(
                             `[205] [CallId: ${r.id}] Sending offer to server participant when server participant is not connected: ${r.serverParticipant.getFullId()}`,
                             { color: "yellow" },
                           ),
@@ -2066,19 +2263,19 @@
                         }
                         if (r.serverParticipant) {
                           const e = (e) => {
-                            e instanceof u.SceytCallException ||
+                            e instanceof p.SceytCallException ||
                             e instanceof Error
-                              ? h.error(
-                                  `[181] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                              ? S.error(
+                                  `[181] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                                   { color: "red" },
                                 )
-                              : e.event === s.SignalEvent.ERROR &&
-                                h.error(
+                              : e.event !== s.SignalEvent.ERROR ||
+                                S.error(
                                   `[185] [CallId: ${r.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                                   { color: "red" },
                                 );
                           };
-                          (h.info(
+                          (S.info(
                             `[188] [CallId: ${r.id}] Sending offer to server participant when there is no server participant in the call: ${r.serverParticipant.getFullId()}`,
                             { color: "yellow" },
                           ),
@@ -2142,7 +2339,7 @@
                   this.callEvents.onOngoingCallsUpdated &&
                     this.callEvents.onOngoingCallsUpdated(this.activeCalls));
               } catch (e) {
-                h.error(
+                S.error(
                   `[248] [CallId: GLOBAL_LOGS] Error syncing calls after reconnection: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
                   { color: "red" },
                 );
@@ -2153,7 +2350,7 @@
             }
             handleSignalMessage(e) {
               switch (
-                (h.info(
+                (S.info(
                   `[253] [CallId: ${e.callId}] Received ${s.SignalEvent[e.event]}: ${JSON.stringify(Object.assign({}, e))}`,
                   { color: "green" },
                 ),
@@ -2229,7 +2426,7 @@
                   this.handleConnectSignal(e);
                   break;
                 default:
-                  h.info(
+                  S.info(
                     `[254] [CallId: ${e.callId}] unhandled signal message: ${JSON.stringify(e)}`,
                     { color: "green" },
                   );
@@ -2241,7 +2438,7 @@
             handleOfferSignal(e) {
               var t, i, a, l;
               if (!this.activeCalls)
-                return void h.warn(
+                return void S.warn(
                   `[342] [CallId: ${e.callId}] No active calls found for send offer participant: ${e.from}`,
                   { color: "red" },
                 );
@@ -2249,12 +2446,12 @@
               try {
                 const o = this.activeCalls.find((t) => t.id === e.callId);
                 if (!o)
-                  return void h.warn(
+                  return void S.warn(
                     `[348] [CallId: ${e.callId}] No active call found for send offer participant: ${e.from}`,
                     { color: "red" },
                   );
                 if (o.state !== s.CallState.Connected)
-                  return void h.warn(
+                  return void S.warn(
                     `[353] [CallId: ${e.callId}] Call is not connected for send offer participant: ${e.from}`,
                     { color: "red" },
                   );
@@ -2270,10 +2467,10 @@
                     void 0 === t
                       ? void 0
                       : t[c.getFullId()]);
-                  let p = null == d ? void 0 : d.getSessionId();
+                  let u = null == d ? void 0 : d.getSessionId();
                   ((!c.shouldResetPeerConnection &&
                     d &&
-                    p ===
+                    u ===
                       (null === (i = e.sessionData) || void 0 === i
                         ? void 0
                         : i.id)) ||
@@ -2304,7 +2501,7 @@
                       n(this, void 0, void 0, function* () {
                         var t, i, n;
                         if (!c)
-                          return void h.info(
+                          return void S.info(
                             `[392] [CallId: ${e.callId}] Participant not found in call: ${e.from}`,
                             { color: "cyan" },
                           );
@@ -2338,12 +2535,12 @@
                             )
                             .then((t) => {
                               if (!c)
-                                return void h.info(
+                                return void S.info(
                                   `[392] [CallId: ${e.callId}] Participant not found in call: ${e.from}`,
                                   { color: "cyan" },
                                 );
                               if (!t)
-                                return void h.error(
+                                return void S.error(
                                   `[456] [CallId: ${o.id}] Failed to create answer for participant: ${c.getFullId()}`,
                                   { color: "red" },
                                 );
@@ -2365,14 +2562,14 @@
                                   metadata: e.metadata,
                                 },
                                 (e) => {
-                                  e instanceof u.SceytCallException ||
+                                  e instanceof p.SceytCallException ||
                                   e instanceof Error
-                                    ? h.error(
-                                        `[386] [CallId: ${o.id}] SYNC ANSWER failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                                    ? S.error(
+                                        `[386] [CallId: ${o.id}] SYNC ANSWER failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                                         { color: "red" },
                                       )
-                                    : e.event === s.SignalEvent.ERROR &&
-                                      h.error(
+                                    : e.event !== s.SignalEvent.ERROR ||
+                                      S.error(
                                         `[389] [CallId: ${o.id}] SYNC ANSWER failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                                         { color: "red" },
                                       );
@@ -2382,12 +2579,12 @@
                       }),
                     ));
                 } else
-                  h.info(
+                  S.info(
                     `[402] [CallId: ${e.callId}] Participant not found in call: ${e.from}`,
                     { color: "cyan" },
                   );
               } catch (t) {
-                h.error(
+                S.error(
                   `[406] [CallId: ${e.callId}] Failed to handle offer: ${r} message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
                   { color: "red" },
                 );
@@ -2421,7 +2618,7 @@
                             n.getFullId()
                           ].getVersion()
                       )
-                        return void h.warn(
+                        return void S.warn(
                           `[412] [CallId: ${i.id}] Version is not set or is the same as the current version: ${a}`,
                           { color: "red" },
                         );
@@ -2434,7 +2631,7 @@
                           (0, g.toSessionDescription)(e.sessionData, "answer"),
                         ).then(() => {
                           if (!n)
-                            return void h.info(
+                            return void S.info(
                               `[462] [CallId: ${e.callId}] Participant not found in call: ${e.from}`,
                               { color: "cyan" },
                             );
@@ -2460,7 +2657,7 @@
                     }
                   }
                 } catch (t) {
-                  h.error(
+                  S.error(
                     `[435] [CallId: ${e.callId}] Failed to handle answer: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
                     { color: "red" },
                   );
@@ -2479,7 +2676,7 @@
                 (n.setVersion(a ? String(Number(a) + 1) : "1"),
                   (a = n.getVersion()));
                 let l = n.getSessionId();
-                (l || ((l = (0, p.v4)()), n.setSessionId(l)),
+                (l || ((l = (0, u.v4)()), n.setSessionId(l)),
                   n.createOffer(l, a, e.mediaFlow).then((n) => {
                     n
                       ? this.signalingClient.sendSignalMessage(
@@ -2493,7 +2690,7 @@
                           },
                           i,
                         )
-                      : h.error(
+                      : S.error(
                           `[456] [CallId: ${e.id}] Failed to create offer for participant: ${t.getFullId()}`,
                           { color: "red" },
                         );
@@ -2532,24 +2729,24 @@
                         ))
                     ) {
                       const e = (e) => {
-                        e instanceof u.SceytCallException || e instanceof Error
-                          ? h.error(
-                              `[495] [CallId: ${t.id}] SYNC OFFER failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                        e instanceof p.SceytCallException || e instanceof Error
+                          ? S.error(
+                              `[495] [CallId: ${t.id}] SYNC OFFER failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                               { color: "red" },
                             )
-                          : e.event === s.SignalEvent.ERROR &&
-                            h.error(
+                          : e.event !== s.SignalEvent.ERROR ||
+                            S.error(
                               `[499] [CallId: ${t.id}] SYNC OFFER failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                               { color: "red" },
                             );
                       };
-                      (h.info(
+                      (S.info(
                         `[503] [CallId: ${t.id}] Sending offer to participant: ${n.getFullId()}`,
                       ),
                         this.sendOfferPeerToPeer(t, n, e));
                     }
                     (n.updateState(s.ParticipantState.Joined, t.id),
-                      h.info(
+                      S.info(
                         `[503] [CallId: ${t.id}] Participant joined call shouldSendEventInvited: ${i}`,
                       ),
                       i
@@ -2563,7 +2760,7 @@
                           ));
                   }
                 } catch (t) {
-                  h.error(
+                  S.error(
                     `[514] [CallId: ${e.callId}] Failed to handle USER_JOINED: message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
                     { color: "red" },
                   );
@@ -2606,7 +2803,7 @@
             }
             handleInviteSignal(e) {
               if (!e || !e.callId)
-                return void h.warn(
+                return void S.warn(
                   `[545] [CallId: ${e.callId}] Received invalid invite signal message`,
                 );
               const t = this.activeCalls.find((t) => t.id === e.callId),
@@ -2716,7 +2913,7 @@
                   this.user.id,
                   this.clientId,
                 ),
-                p = new o.Call({
+                u = new o.Call({
                   id: e.callId,
                   sessionId: e.sessionId,
                   mediaFlow: e.mediaFlow,
@@ -2727,10 +2924,10 @@
                   chatClient: this.chatClient,
                   isCallSilenced: l,
                 });
-              (this.activeCalls.push(p),
+              (this.activeCalls.push(u),
                 this.callEvents.onInvitedToCall &&
                   t &&
-                  this.callEvents.onInvitedToCall(p),
+                  this.callEvents.onInvitedToCall(u),
                 this.callEvents.onOngoingCallsUpdated &&
                   this.callEvents.onOngoingCallsUpdated(this.activeCalls));
             }
@@ -2798,8 +2995,11 @@
                     clientId: this.clientId,
                   }) === e.from
                 )
-                  (this.leaveCall(i, !0, "handleDeclineSignal"),
-                    i.setState(s.CallState.Idle, "handleDeclineSignal"));
+                  (this.leaveCall(i, !0, "Current user declined the call"),
+                    i.setState(
+                      s.CallState.Idle,
+                      "Current user declined the call",
+                    ));
                 else {
                   let n =
                     null == i
@@ -2864,16 +3064,16 @@
                 const e = new a.Participant(t.id);
                 t.setServerParticipant(e);
                 const i = (e) => {
-                  e instanceof u.SceytCallException || e instanceof Error
-                    ? h.error(
-                        `[738] [CallId: ${t.id}] SYNC OFFER failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                  e instanceof p.SceytCallException || e instanceof Error
+                    ? S.error(
+                        `[738] [CallId: ${t.id}] SYNC OFFER failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                       )
-                    : e.event === s.SignalEvent.ERROR &&
-                      h.error(
+                    : e.event !== s.SignalEvent.ERROR ||
+                      S.error(
                         `[742] [CallId: ${t.id}] SYNC OFFER failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                       );
                 };
-                (h.info(
+                (S.info(
                   `[747] [CallId: ${t.id}] Sending offer to server participant: ${e.getFullId()}`,
                 ),
                   this.sendOfferPeerToPeer(t, e, i),
@@ -2885,19 +3085,19 @@
             handleIceSignal(e) {
               var t;
               if (!e.callId || !e.ice)
-                return void h.warn(
+                return void S.warn(
                   `[756] [CallId: ${e.callId}] Invalid ICE signal: missing callId or ice data`,
                 );
               const i = this.activeCalls.find((t) => t.id === e.callId);
               if (!i)
-                return void h.warn(
+                return void S.warn(
                   `[763] [CallId: ${e.callId}] ICE candidate received for unknown call: ${e.callId}`,
                 );
               const n = i.participants.find((t) => t.getFullId() === e.from);
               if (n)
                 try {
                   if (!this.callParticipantsRTCMap[i.id])
-                    return void h.error(
+                    return void S.error(
                       `[774] [CallId: ${i.id}] No RTC map found for call ${i.id}`,
                     );
                   null ===
@@ -2905,12 +3105,12 @@
                     void 0 === t ||
                     t.addIceCandidate(e.ice, n.getFullId());
                 } catch (e) {
-                  h.error(
+                  S.error(
                     `[787] [CallId: ${i.id}] Failed to add ICE candidate for participant ${n.getFullId()} in call ${i.id}: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
                   );
                 }
               else
-                h.warn(
+                S.warn(
                   `[768] [CallId: ${e.callId}] ICE candidate received from unknown participant: ${e.from} in call ${e.callId}`,
                 );
             }
@@ -2955,8 +3155,7 @@
                     ? void 0
                     : t.participants.find((t) => t.getFullId() === e.from);
                 i &&
-                  (i.setVideoEnabled(!0),
-                  i.setScreenSharing(!0),
+                  (i.setScreenSharing(!0),
                   t.emitParticipantEvent(i, "ScreenSharingStarted"));
               }
             }
@@ -2969,9 +3168,12 @@
                     ? void 0
                     : t.participants.find((t) => t.getFullId() === e.from);
                 i &&
-                  (i.setVideoEnabled(!1),
-                  i.setScreenSharing(!1),
-                  t.emitParticipantEvent(i, "ScreenSharingStopped"));
+                  (i.setScreenSharing(!1),
+                  t.emitParticipantEvent(i, "ScreenSharingStopped"),
+                  i.videoEnabled &&
+                    (i.setVideoEnabled(!0),
+                    t.emitParticipantEvent(i, "VideoEnabled"),
+                    t.setVideoEnabled(!0)));
               }
             }
             handleMuteSignal(e) {
@@ -3061,7 +3263,7 @@
                   }));
             }
             static getInstance() {
-              return S.instance;
+              return C.instance;
             }
             setRTCConfig(e) {
               this.rtcConfig = e;
@@ -3079,7 +3281,7 @@
                   void 0 === n
                     ? void 0
                     : n.signalingState) || "unknown";
-                h.info(
+                S.info(
                   `[1067] [CallId: ${t.id}] Signaling state change: ${a}, participantID: ${e.getFullId()}`,
                   { color: "blue" },
                 );
@@ -3096,7 +3298,7 @@
                   void 0 === n
                     ? void 0
                     : n.iceConnectionState) || "unknown";
-                h.info(
+                S.info(
                   `[1078] [CallId: ${t.id}] ICE connection state change: ${a}, participantID: ${e.getFullId()}`,
                   { color: "blue" },
                 );
@@ -3106,7 +3308,7 @@
               return (i) => {
                 var n, a, l, r, o;
                 const c = i.currentTarget.connectionState;
-                h.info(
+                S.info(
                   `[1078] [CallId: ${t.id}] PC connection state changed: ${c}, participantID: ${e.getFullId()}`,
                   {
                     color:
@@ -3118,7 +3320,7 @@
                   },
                 );
                 const d = this.activeCalls.find((e) => e.id === t.id) || t,
-                  p =
+                  u =
                     (null == d
                       ? void 0
                       : d.participants.find(
@@ -3133,21 +3335,21 @@
                       e) ||
                     e;
                 let g = 0,
-                  S = null;
+                  h = null;
                 const C = (i, n = !1) => {
-                    h.info(
-                      `[1089] [CallId: ${t.id}] start renegotiation send ${i} to participant ${p.getFullId()}`,
+                    S.info(
+                      `[1089] [CallId: ${t.id}] start renegotiation send ${i} to participant ${u.getFullId()}`,
                       { color: "blue" },
                     );
                     const a = (e) => {
                       if (
                         "Connected" === this.chatClient.connectionState &&
-                        p.connectionState !==
+                        u.connectionState !==
                           s.ParticipantConnectionState.Connected &&
                         d.state === s.CallState.Connected
                       ) {
-                        h.info(
-                          `[1190] [CallId: ${t.id}] interval renegotiation send ${i} to participant ${p.getFullId()}`,
+                        S.info(
+                          `[1190] [CallId: ${t.id}] interval renegotiation send ${i} to participant ${u.getFullId()}`,
                           { color: "blue" },
                         );
                         try {
@@ -3155,7 +3357,7 @@
                             "offer" !== i ||
                             (n &&
                               !this.isPolitePeer(
-                                p.getFullId(),
+                                u.getFullId(),
                                 (null == d
                                   ? void 0
                                   : d.localParticipant.getFullId()) || "",
@@ -3165,20 +3367,20 @@
                               "connect" === i &&
                               (!n ||
                                 this.isPolitePeer(
-                                  p.getFullId(),
+                                  u.getFullId(),
                                   (null == d
                                     ? void 0
                                     : d.localParticipant.getFullId()) || "",
                                 ))
                             ) {
-                              h.info(
-                                `[1214] [CallId: ${t.id}] ${s.MediaFlow.SFU} sendConnect to participant 1 ${JSON.stringify(p)}`,
+                              S.info(
+                                `[1214] [CallId: ${t.id}] ${s.MediaFlow.SFU} sendConnect to participant 1 ${JSON.stringify(u)}`,
                                 { color: "blue" },
                               );
                               try {
                                 (this.signalingClient.clearParticipantSignals(
                                   t.id,
-                                  p.getFullId(),
+                                  u.getFullId(),
                                 ),
                                   this.signalingClient.sendSignalMessage(
                                     {
@@ -3186,37 +3388,37 @@
                                       callId: t.id,
                                       sessionId: t.sessionId,
                                       event: s.SignalEvent.CONNECT,
-                                      to: p.getFullId(),
+                                      to: u.getFullId(),
                                     },
                                     e,
                                   ));
                               } catch (e) {
-                                h.error(
-                                  `[1236] [CallId: ${t.id}] Failed to send connect to participant ${p.getFullId()}: message: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                                S.error(
+                                  `[1236] [CallId: ${t.id}] Failed to send connect to participant ${u.getFullId()}: message: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
                                   { color: "red" },
                                 );
                               }
                             }
                           } else
                             try {
-                              (h.info(
-                                `[1211] [CallId: ${t.id}] Sending offer to participant: ${p.getFullId()}`,
+                              (S.info(
+                                `[1211] [CallId: ${t.id}] Sending offer to participant: ${u.getFullId()}`,
                               ),
-                                this.sendOfferPeerToPeer(t, p, e));
+                                this.sendOfferPeerToPeer(t, u, e));
                             } catch (e) {
-                              h.error(
-                                `[1211] [CallId: ${t.id}] Failed to send offer to participant ${p.getFullId()}: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                              S.error(
+                                `[1211] [CallId: ${t.id}] Failed to send offer to participant ${u.getFullId()}: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
                               );
                             }
                         } catch (e) {
-                          h.error(
-                            `[1240] [CallId: ${t.id}] Failed to send offer to participant ${p.getFullId()}: message: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+                          S.error(
+                            `[1240] [CallId: ${t.id}] Failed to send offer to participant ${u.getFullId()}: message: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
                             { color: "red" },
                           );
                         }
                       }
                     };
-                    S = setInterval(() => {
+                    h = setInterval(() => {
                       var n, l, r;
                       const o =
                           this.activeCalls.find((e) => e.id === t.id) || t,
@@ -3234,7 +3436,7 @@
                               : n.id) &&
                             e) ||
                           e;
-                      h.info(
+                      S.info(
                         `[1182] [CallId: ${t.id}] interval time: ${g + 4}`,
                         { color: "green" },
                       );
@@ -3252,14 +3454,14 @@
                             s.ParticipantConnectionState.Connected &&
                           "stable" === (null == d ? void 0 : d.signalingState)
                           ? ((g = 0),
-                            void (S && (clearInterval(S), (S = null))))
+                            void (h && (clearInterval(h), (h = null))))
                           : ((g += 4),
                             a((e) => {
                               var n;
-                              return e instanceof u.SceytCallException ||
+                              return e instanceof p.SceytCallException ||
                                 e instanceof Error
-                                ? (h.error(
-                                    `[1202] [CallId: ${t.id}] SYNC ${i} failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                                ? (S.error(
+                                    `[1202] [CallId: ${t.id}] SYNC ${i} failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                                     { color: "red" },
                                   ),
                                   void (
@@ -3268,10 +3470,10 @@
                                       s.ParticipantConnectionState.Disconnected,
                                       t.id,
                                     ),
-                                    S && (clearInterval(S), (S = null)))
+                                    h && (clearInterval(h), (h = null)))
                                   ))
                                 : e.event === s.SignalEvent.ERROR
-                                  ? (h.error(
+                                  ? (S.error(
                                       `[1205] [CallId: ${t.id}] SYNC ${i} failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                                       { color: "red" },
                                     ),
@@ -3285,36 +3487,36 @@
                                           .Disconnected,
                                         t.id,
                                       ),
-                                      S && (clearInterval(S), (S = null)))
+                                      h && (clearInterval(h), (h = null)))
                                     ))
                                   : void 0;
                             }),
                             void (
                               (o && o.state === s.CallState.Connected) ||
-                              ((g = 0), S && (clearInterval(S), (S = null)))
+                              ((g = 0), h && (clearInterval(h), (h = null)))
                             ))
-                        : ((g = 0), void (S && (clearInterval(S), (S = null))));
+                        : ((g = 0), void (h && (clearInterval(h), (h = null))));
                     }, 4e3);
                     const l = setTimeout(() => {
                       (a((e) => {
                         var i;
-                        return e instanceof u.SceytCallException ||
+                        return e instanceof p.SceytCallException ||
                           e instanceof Error
-                          ? (h.error(
-                              `[1202] [CallId: ${t.id}] SYNC OFFER failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                          ? (S.error(
+                              `[1202] [CallId: ${t.id}] SYNC OFFER failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                               { color: "red" },
                             ),
                             void (
                               ("NotAllowed" === e.name ||
-                                (e instanceof u.SceytCallException &&
+                                (e instanceof p.SceytCallException &&
                                   4002 === e.code)) &&
-                              p.updateConnectionState(
+                              u.updateConnectionState(
                                 s.ParticipantConnectionState.Disconnected,
                                 t.id,
                               )
                             ))
                           : e.event === s.SignalEvent.ERROR
-                            ? (h.error(
+                            ? (S.error(
                                 `[1205] [CallId: ${t.id}] SYNC OFFER failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                                 { color: "red" },
                               ),
@@ -3323,7 +3525,7 @@
                                   (null === (i = e.error) || void 0 === i
                                     ? void 0
                                     : i.code) &&
-                                p.updateConnectionState(
+                                u.updateConnectionState(
                                   s.ParticipantConnectionState.Disconnected,
                                   t.id,
                                 )
@@ -3333,10 +3535,10 @@
                         clearTimeout(l));
                     }, 2e3);
                   },
-                  f = () => {
+                  v = () => {
                     var i;
-                    S ||
-                      (p &&
+                    h ||
+                      (u &&
                         d &&
                         (d.mediaFlow === s.MediaFlow.SFU &&
                           e.id ===
@@ -3349,19 +3551,19 @@
                           this.callParticipantsRTCMap[d.id][e.getFullId()] &&
                           d.localParticipant.state ===
                             s.ParticipantState.Joined &&
-                          (h.info(
-                            `[1258] [CallId: ${t.id}] start renegotiation ${s.MediaFlow.SFU} sendOffer to participant ${p.getFullId()}`,
+                          (S.info(
+                            `[1258] [CallId: ${t.id}] start renegotiation ${s.MediaFlow.SFU} sendOffer to participant ${u.getFullId()}`,
                             { color: "blue" },
                           ),
                           C("offer", !1)),
                         d.mediaFlow === s.MediaFlow.S2W &&
-                          p.state === s.ParticipantState.Joined &&
+                          u.state === s.ParticipantState.Joined &&
                           this.callParticipantsRTCMap[d.id] &&
-                          this.callParticipantsRTCMap[d.id][p.getFullId()] &&
+                          this.callParticipantsRTCMap[d.id][u.getFullId()] &&
                           d.localParticipant.state ===
                             s.ParticipantState.Joined &&
-                          (h.info(
-                            `[1263] [CallId: ${t.id}] start renegotiation ${s.MediaFlow.SFU} sendConnect to participant ${p.getFullId()}`,
+                          (S.info(
+                            `[1263] [CallId: ${t.id}] start renegotiation ${s.MediaFlow.SFU} sendConnect to participant ${u.getFullId()}`,
                             { color: "blue" },
                           ),
                           C("offer", !1))));
@@ -3371,7 +3573,7 @@
                     break;
                   case "connecting":
                     (t.mediaFlow === s.MediaFlow.SFU &&
-                      p.id ===
+                      u.id ===
                         (null ===
                           (a = null == d ? void 0 : d.serverParticipant) ||
                         void 0 === a
@@ -3385,19 +3587,19 @@
                         d.localParticipant,
                         s.ParticipantConnectionState.Connecting,
                       ),
-                      p.updateConnectionState(
+                      u.updateConnectionState(
                         s.ParticipantConnectionState.Connecting,
                         t.id,
                       ) &&
                         d.emitParticipantConnectionStateChanged(
-                          p,
+                          u,
                           s.ParticipantConnectionState.Connecting,
                         ));
                     break;
                   case "connected":
                     if (
                       (t.mediaFlow === s.MediaFlow.SFU &&
-                        p.id ===
+                        u.id ===
                           (null ===
                             (l = null == d ? void 0 : d.serverParticipant) ||
                           void 0 === l
@@ -3411,29 +3613,29 @@
                           d.localParticipant,
                           s.ParticipantConnectionState.Connected,
                         ),
-                      p.updateConnectionState(
+                      u.updateConnectionState(
                         s.ParticipantConnectionState.Connected,
                         t.id,
                       ) &&
                         d.emitParticipantConnectionStateChanged(
-                          p,
+                          u,
                           s.ParticipantConnectionState.Connected,
                         ),
-                      p &&
+                      u &&
                         d &&
                         "Connected" === this.chatClient.connectionState &&
                         (d.mediaFlow !== s.MediaFlow.SFU ||
                           (d.mediaFlow === s.MediaFlow.SFU &&
-                            p.id === (null == d ? void 0 : d.id))))
+                            u.id === (null == d ? void 0 : d.id))))
                     ) {
                       const e = (e) => {
-                        e instanceof u.SceytCallException || e instanceof Error
-                          ? h.error(
-                              `[1098] [CallId: ${d.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                        e instanceof p.SceytCallException || e instanceof Error
+                          ? S.error(
+                              `[1098] [CallId: ${d.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                               { color: "red" },
                             )
-                          : e.event === s.SignalEvent.ERROR &&
-                            h.error(
+                          : e.event !== s.SignalEvent.ERROR ||
+                            S.error(
                               `[1102] [CallId: ${d.id}] SYNC MEDIA_CONNECTED signal sent failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                               { color: "red" },
                             );
@@ -3454,7 +3656,7 @@
                     break;
                   case "disconnected":
                     (t.mediaFlow === s.MediaFlow.SFU &&
-                      p.id ===
+                      u.id ===
                         (null ===
                           (r = null == d ? void 0 : d.serverParticipant) ||
                         void 0 === r
@@ -3468,35 +3670,35 @@
                         d.localParticipant,
                         s.ParticipantConnectionState.Reconnecting,
                       ),
-                      p.updateConnectionState(
+                      u.updateConnectionState(
                         s.ParticipantConnectionState.Reconnecting,
                         t.id,
                       ) &&
                         d.emitParticipantConnectionStateChanged(
-                          p,
+                          u,
                           s.ParticipantConnectionState.Reconnecting,
                         ),
-                      h.info("[1250] I am here", { color: "blue" }),
-                      t.mediaFlow !== s.MediaFlow.S2W && f());
+                      S.info("[1250] I am here", { color: "blue" }),
+                      t.mediaFlow !== s.MediaFlow.S2W && v());
                     break;
                   case "failed":
-                    p &&
+                    u &&
                       d &&
                       (d.mediaFlow === s.MediaFlow.P2P &&
-                      p.state === s.ParticipantState.Joined &&
+                      u.state === s.ParticipantState.Joined &&
                       this.callParticipantsRTCMap[d.id] &&
-                      this.callParticipantsRTCMap[d.id][p.getFullId()] &&
+                      this.callParticipantsRTCMap[d.id][u.getFullId()] &&
                       d.localParticipant.state === s.ParticipantState.Joined
-                        ? (h.info(
-                            `[1268] [CallId: ${t.id}] start renegotiation ${d.mediaFlow} sendOffer to participant ${p.getFullId()}`,
+                        ? (S.info(
+                            `[1268] [CallId: ${t.id}] start renegotiation ${d.mediaFlow} sendOffer to participant ${u.getFullId()}`,
                             { color: "blue" },
                           ),
                           C("offer", !0))
-                        : f());
+                        : v());
                     break;
                   case "closed":
                     (t.mediaFlow === s.MediaFlow.SFU &&
-                      p.id ===
+                      u.id ===
                         (null ===
                           (o = null == d ? void 0 : d.serverParticipant) ||
                         void 0 === o
@@ -3510,12 +3712,12 @@
                         d.localParticipant,
                         s.ParticipantConnectionState.Idle,
                       ),
-                      p.updateConnectionState(
+                      u.updateConnectionState(
                         s.ParticipantConnectionState.Idle,
                         t.id,
                       ) &&
                         d.emitParticipantConnectionStateChanged(
-                          p,
+                          u,
                           s.ParticipantConnectionState.Idle,
                         ));
                 }
@@ -3523,7 +3725,7 @@
             }
             onIceCandidateErrorListener(e, t) {
               return (i) => {
-                h.error(
+                S.error(
                   `[1284] [CallId: ${t.id}] ICE candidate error participantID: ${e.getFullId()}, error - code: ${i.errorCode}, message: ${i.errorText}, url: ${i.url}`,
                   { color: "red" },
                 );
@@ -3542,11 +3744,11 @@
                     ? (Object.keys(i.listeners).forEach((e) => {
                         i.removeEventListener(e, i.listeners[e]);
                       }),
-                      h.info(
+                      S.info(
                         `[1313] [CallId: ${e}] Removed all listeners for WebRTCClient of participant ${t}`,
                         { color: "cyan" },
                       ))
-                    : h.info(
+                    : S.info(
                         `[1316] [CallId: ${e}] No listeners found for WebRTCClient of participant ${t}`,
                         { color: "cyan" },
                       ),
@@ -3558,7 +3760,7 @@
                   (i.peerConnection.onsignalingstatechange = null),
                   (this.callParticipantsRTCMap[e][t] = null),
                   delete this.callParticipantsRTCMap[e][t])
-                : h.info(
+                : S.info(
                     `[1375] [CallId: ${e}] No WebRTCClient found for participant ${t}`,
                     { color: "cyan" },
                   );
@@ -3589,7 +3791,7 @@
                   iceCandidateErrorListener: c,
                   iceConnectionStateChangeListener: r,
                 }),
-                h.info(
+                S.info(
                   `[1371] [CallId: ${e.id}] Added Event Listeners to RTC Map: participantID: ${t.getFullId()}`,
                   { color: "blue" },
                 ),
@@ -3612,82 +3814,119 @@
                 t,
               );
             }
-            sendRinging(e) {
-              return this.signalingClient.sendSignalMessage(
-                {
-                  mediaFlow: e.mediaFlow,
-                  callId: e.id,
-                  sessionId: e.sessionId,
-                  event: s.SignalEvent.RINGING,
-                },
-                (t) => {
-                  t instanceof u.SceytCallException || t instanceof Error
-                    ? h.error(
-                        `[1389] [CallId: ${e.id}] SYNC RINGING failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
-                        { color: "red" },
-                      )
-                    : t.event !== s.SignalEvent.ERROR
-                      ? (e.localParticipant.updateState(
-                          s.ParticipantState.Ringing,
-                          e.id,
-                        ),
-                        e.emitParticipantStateChanged(
-                          e.localParticipant,
-                          s.ParticipantState.Ringing,
-                        ))
-                      : h.error(
-                          `[1393] [CallId: ${e.id}] SYNC RINGING failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
-                          { color: "red" },
-                        );
-                },
-              );
-            }
-            rejectCall(e, t) {
-              const i = this.activeCalls.find((t) => t.id === e.id);
+            sendRinging(e, t) {
               return (
-                i &&
-                  (i.setState(s.CallState.Idle, "rejectCall"),
-                  i.localParticipant.updateState(
-                    s.ParticipantState.Declined,
-                    e.id,
-                  ) &&
-                    i.emitParticipantStateChanged(
-                      i.localParticipant,
-                      s.ParticipantState.Declined,
-                    ),
-                  i.localParticipant.updateConnectionState(
-                    s.ParticipantConnectionState.Idle,
-                    e.id,
-                  ) &&
-                    i.emitParticipantConnectionStateChanged(
-                      i.localParticipant,
-                      s.ParticipantConnectionState.Idle,
-                    ),
-                  this.closeTracksAndPeerConnections(i)),
                 this.signalingClient.sendSignalMessage(
                   {
                     mediaFlow: e.mediaFlow,
                     callId: e.id,
                     sessionId: e.sessionId,
-                    event: s.SignalEvent.DECLINE,
-                    metadata: Object.assign(Object.assign({}, e.metadata), {
-                      reason: t || "",
-                    }),
+                    event: s.SignalEvent.RINGING,
                   },
-                  (t) => {
-                    t instanceof u.SceytCallException || t instanceof Error
-                      ? h.error(
-                          `[1420] [CallId: ${e.id}] SYNC DECLINE failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                  (i) =>
+                    i instanceof p.SceytCallException || i instanceof Error
+                      ? (S.error(
+                          `[1389] [CallId: ${e.id}] SYNC RINGING failed message: ${i.message} code: ${i instanceof p.SceytCallException ? i.code : ""}`,
                           { color: "red" },
-                        )
-                      : t.event === s.SignalEvent.ERROR &&
-                        h.error(
+                        ),
+                        void (
+                          null == t || t({ error: (0, h.toCallException)(i) })
+                        ))
+                      : i.event === s.SignalEvent.ERROR
+                        ? (S.error(
+                            `[1393] [CallId: ${e.id}] SYNC RINGING failed message: ${i.error ? `${i.error.message} code: ${i.error.code}` : ""}`,
+                            { color: "red" },
+                          ),
+                          void (
+                            null == t ||
+                            t({
+                              error: (0, h.toCallException)(
+                                new Error("Failed to send ringing signal"),
+                              ),
+                            })
+                          ))
+                        : (e.localParticipant.updateState(
+                            s.ParticipantState.Ringing,
+                            e.id,
+                          ),
+                          void e.emitParticipantStateChanged(
+                            e.localParticipant,
+                            s.ParticipantState.Ringing,
+                          )),
+                ),
+                { success: !0 }
+              );
+            }
+            rejectCall(e, t, i) {
+              try {
+                const n = this.activeCalls.find((t) => t.id === e.id);
+                n &&
+                  (n.setState(s.CallState.Idle, "rejectCall"),
+                  n.localParticipant.updateState(
+                    s.ParticipantState.Declined,
+                    e.id,
+                  ) &&
+                    n.emitParticipantStateChanged(
+                      n.localParticipant,
+                      s.ParticipantState.Declined,
+                    ),
+                  n.localParticipant.updateConnectionState(
+                    s.ParticipantConnectionState.Idle,
+                    e.id,
+                  ) &&
+                    n.emitParticipantConnectionStateChanged(
+                      n.localParticipant,
+                      s.ParticipantConnectionState.Idle,
+                    ),
+                  this.closeTracksAndPeerConnections(n));
+                const a = (t) =>
+                  t instanceof p.SceytCallException || t instanceof Error
+                    ? (S.error(
+                        `[1420] [CallId: ${e.id}] SYNC DECLINE failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
+                        { color: "red" },
+                      ),
+                      void (
+                        null == i || i({ error: (0, h.toCallException)(t) })
+                      ))
+                    : t.event === s.SignalEvent.ERROR
+                      ? (S.error(
                           `[1424] [CallId: ${e.id}] SYNC DECLINE failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                           { color: "red" },
-                        );
-                  },
-                )
-              );
+                        ),
+                        void (
+                          null == i ||
+                          i({
+                            error: (0, h.toCallException)(
+                              t.error ||
+                                new Error("Failed to send decline signal"),
+                            ),
+                          })
+                        ))
+                      : void 0;
+                return (
+                  this.signalingClient.sendSignalMessage(
+                    {
+                      mediaFlow: e.mediaFlow,
+                      callId: e.id,
+                      sessionId: e.sessionId,
+                      event: s.SignalEvent.DECLINE,
+                      metadata: Object.assign(Object.assign({}, e.metadata), {
+                        reason: t || "",
+                      }),
+                    },
+                    a,
+                  ),
+                  { success: !0 }
+                );
+              } catch (t) {
+                return (
+                  S.error(
+                    `[1432] [CallId: ${e.id}] Failed to reject call: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
+                    { color: "red" },
+                  ),
+                  { success: !1, error: (0, h.toCallException)(t) }
+                );
+              }
             }
             closeTracksAndPeerConnections(e) {
               (e.localAudioTracks.forEach((e) => {
@@ -3733,7 +3972,7 @@
                 this.callEvents.onOngoingCallsUpdated &&
                   this.callEvents.onOngoingCallsUpdated(this.activeCalls),
                 delete this.callParticipantsRTCMap[e.id],
-                h.info(
+                S.info(
                   `[1474] [CallId: ${e.id}] closed call and removed from active calls: callId: ${e.id}`,
                   { color: "light-green" },
                 ));
@@ -3745,13 +3984,13 @@
                 const a = n.setState(s.CallState.Idle, `leaveCall: ${i}`);
                 if (t && a) {
                   const t = (t) => {
-                    t instanceof u.SceytCallException || t instanceof Error
-                      ? h.error(
-                          `[1487] [CallId: ${e.id}] SYNC LEAVE failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                    t instanceof p.SceytCallException || t instanceof Error
+                      ? S.error(
+                          `[1487] [CallId: ${e.id}] SYNC LEAVE failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
                           { color: "red" },
                         )
-                      : t.event === s.SignalEvent.ERROR &&
-                        h.error(
+                      : t.event !== s.SignalEvent.ERROR ||
+                        S.error(
                           `[1491] [CallId: ${e.id}] SYNC LEAVE failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                           { color: "red" },
                         );
@@ -3807,63 +4046,78 @@
             setRemoteDescription(e, t, i) {
               return this.callParticipantsRTCMap[e][t].setRemoteDescription(i);
             }
-            changeVideoTracks(e, t, i) {
-              var n;
-              (h.info(
-                `[1594] [CallId: ${e.id}], mediaFlow: ${e.mediaFlow}, changeVideoTracks ${i}, serverParticipant: ${(null === (n = e.serverParticipant) || void 0 === n ? void 0 : n.id) || "null"}`,
-                { color: "cyan" },
-              ),
+            changeVideoTracks(e, t, i, a) {
+              var l;
+              return n(this, void 0, void 0, function* () {
+                if (
+                  (S.info(
+                    `[1594] [CallId: ${e.id}], mediaFlow: ${e.mediaFlow}, changeVideoTracks ${i}, serverParticipant: ${(null === (l = e.serverParticipant) || void 0 === l ? void 0 : l.id) || "null"}`,
+                    { color: "cyan" },
+                  ),
+                  e.mediaFlow !== s.MediaFlow.SFU)
+                )
+                  for (let n = 0; n < e.participants.length; n++) {
+                    const l = e.participants[n];
+                    (l.id !== this.user.id || l.clientId !== this.clientId) &&
+                      l.clientId &&
+                      this.callParticipantsRTCMap[e.id] &&
+                      this.callParticipantsRTCMap[e.id][l.getFullId()] &&
+                      (yield this.callParticipantsRTCMap[e.id][
+                        l.getFullId()
+                      ].enableVideoOnPeerConnection(i, t, !!a));
+                  }
+                else
+                  this.callParticipantsRTCMap[e.id] &&
+                    this.callParticipantsRTCMap[e.id][e.id] &&
+                    (yield this.callParticipantsRTCMap[e.id][
+                      e.id
+                    ].enableVideoOnPeerConnection(i, t, !!a));
+              });
+            }
+            changeAudioTracks(e, t, i) {
+              return n(this, void 0, void 0, function* () {
                 e.mediaFlow !== s.MediaFlow.SFU
                   ? e.participants.forEach((n) => {
                       (n.id !== this.user.id || n.clientId !== this.clientId) &&
-                        n.clientId &&
                         this.callParticipantsRTCMap[e.id] &&
                         this.callParticipantsRTCMap[e.id][n.getFullId()] &&
+                        (S.info(
+                          `[1561] [CallId: ${e.id}] Enabling audio on peer connection: ${n.getFullId()}`,
+                          { color: "cyan" },
+                        ),
                         this.callParticipantsRTCMap[e.id][
                           n.getFullId()
-                        ].enableVideoOnPeerConnection(i, t);
+                        ].enableAudioOnPeerConnection(i, t));
                     })
-                  : this.callParticipantsRTCMap[e.id] &&
-                    this.callParticipantsRTCMap[e.id][e.id] &&
-                    this.callParticipantsRTCMap[e.id][
+                  : (S.info(
+                      `[1565] [CallId: ${e.id}] Enabling audio on peer connection: ${e.id}`,
+                      { color: "cyan" },
+                    ),
+                    yield this.callParticipantsRTCMap[e.id][
                       e.id
-                    ].enableVideoOnPeerConnection(i, t));
+                    ].enableAudioOnPeerConnection(i, t));
+              });
             }
-            changeAudioTracks(e, t, i) {
-              e.mediaFlow !== s.MediaFlow.SFU
-                ? e.participants.forEach((n) => {
-                    (n.id !== this.user.id || n.clientId !== this.clientId) &&
-                      this.callParticipantsRTCMap[e.id] &&
-                      this.callParticipantsRTCMap[e.id][n.getFullId()] &&
-                      (h.info(
-                        `[1561] [CallId: ${e.id}] Enabling audio on peer connection: ${n.getFullId()}`,
-                        { color: "cyan" },
-                      ),
-                      this.callParticipantsRTCMap[e.id][
-                        n.getFullId()
-                      ].enableAudioOnPeerConnection(i, t));
-                  })
-                : (h.info(
-                    `[1565] [CallId: ${e.id}] Enabling audio on peer connection: ${e.id}`,
-                    { color: "cyan" },
-                  ),
-                  this.callParticipantsRTCMap[e.id][
-                    e.id
-                  ].enableAudioOnPeerConnection(i, t));
-            }
-            sendVideoEnabled(e, t) {
+            sendVideoEnabled(e, t, i) {
               if (this.activeCalls.find((t) => t.id === e.id))
                 try {
-                  const i = (t) => {
-                    t instanceof u.SceytCallException || t instanceof Error
-                      ? h.error(
-                          `[1632] [CallId: ${e.id}] SYNC VIDEO_ON failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
-                        )
-                      : t.event === s.SignalEvent.ERROR &&
-                        h.error(
-                          `[1636] [CallId: ${e.id}] SYNC VIDEO_ON failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
-                        );
-                  };
+                  const n = (t) =>
+                    t instanceof p.SceytCallException || t instanceof Error
+                      ? (S.error(
+                          `[1632] [CallId: ${e.id}] SYNC VIDEO_ON failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
+                        ),
+                        void (
+                          null == i || i({ error: (0, h.toCallException)(t) })
+                        ))
+                      : t.event === s.SignalEvent.ERROR
+                        ? (S.error(
+                            `[1636] [CallId: ${e.id}] SYNC VIDEO_ON failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
+                          ),
+                          void (
+                            null == i ||
+                            i({ error: (0, h.toCallException)(t.error || t) })
+                          ))
+                        : void 0;
                   this.signalingClient.sendSignalMessage(
                     {
                       mediaFlow: e.mediaFlow,
@@ -3873,108 +4127,129 @@
                         : s.SignalEvent.VIDEO_OFF,
                       sessionId: e.sessionId,
                     },
-                    i,
+                    n,
                   );
                 } catch (t) {
-                  h.error(
-                    `[1645] [CallId: ${e.id}] Failed to send video enabled signal: message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
-                    { color: "red" },
+                  return (
+                    S.error(
+                      `[1645] [CallId: ${e.id}] Failed to send video enabled signal: message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
+                      { color: "red" },
+                    ),
+                    null == i || i({ error: (0, h.toCallException)(t) }),
+                    !1
                   );
                 }
             }
             sendScreenShare(e, t, i) {
-              if (this.activeCalls.find((t) => t.id === e.id))
-                return (
-                  e.mediaFlow !== s.MediaFlow.SFU
-                    ? e.participants.forEach((n) => {
-                        (n.id === this.user.id &&
-                          n.clientId === this.clientId) ||
-                          !n.clientId ||
-                          (this.callParticipantsRTCMap[e.id] &&
-                            this.callParticipantsRTCMap[e.id][n.getFullId()] &&
-                            this.callParticipantsRTCMap[e.id][
-                              n.getFullId()
-                            ].enableVideoOnPeerConnection(t, i, !0));
-                      })
-                    : this.callParticipantsRTCMap[e.id] &&
-                      this.callParticipantsRTCMap[e.id][
-                        e.serverParticipant.id
-                      ] &&
-                      this.callParticipantsRTCMap[e.id][
-                        e.serverParticipant.id +
-                          (e.serverParticipant.clientId
-                            ? "/" + e.serverParticipant.clientId
-                            : "")
-                      ].enableVideoOnPeerConnection(t, i, !0),
-                  this.sendSignalScreenShare(e, t)
-                );
+              return n(this, void 0, void 0, function* () {
+                const n = this.activeCalls.find((t) => t.id === e.id);
+                try {
+                  if (n) return this.sendSignalScreenShare(e, t, i);
+                } catch (t) {
+                  return (
+                    S.error(
+                      `[1668] [CallId: ${e.id}] Failed to send screen share signal: message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
+                      { color: "red" },
+                    ),
+                    null == i || i({ error: (0, h.toCallException)(t) }),
+                    !1
+                  );
+                }
+              });
             }
-            sendAudioEnable(e, t) {
-              if (this.activeCalls.find((t) => t.id === e.id)) {
-                const i = (i) => {
-                  i instanceof u.SceytCallException || i instanceof Error
-                    ? h.error(
-                        `[1704] [CallId: ${e.id}] SYNC HOLD failed message: ${i.message} code: ${i instanceof u.SceytCallException ? i.code : ""}`,
-                      )
-                    : (i.event === s.SignalEvent.ERROR &&
-                        h.error(
-                          `[1708] [CallId: ${e.id}] SYNC HOLD failed message: ${i.error ? `${i.error.message} code: ${i.error.code}` : ""}`,
-                        ),
-                      e.mediaFlow !== s.MediaFlow.SFU
-                        ? e.participants.forEach((i) => {
-                            (i.id !== this.user.id ||
-                              i.clientId !== this.clientId) &&
-                              i.clientId &&
+            sendAudioEnable(e, t, i) {
+              return n(this, void 0, void 0, function* () {
+                if (this.activeCalls.find((t) => t.id === e.id)) {
+                  const a = (a) =>
+                    n(this, void 0, void 0, function* () {
+                      try {
+                        if (
+                          a instanceof p.SceytCallException ||
+                          a instanceof Error
+                        )
+                          return (
+                            S.error(
+                              `[1704] [CallId: ${e.id}] SYNC HOLD failed message: ${a.message} code: ${a instanceof p.SceytCallException ? a.code : ""}`,
+                            ),
+                            void (
+                              null == i ||
+                              i({ error: (0, h.toCallException)(a) })
+                            )
+                          );
+                        if (a.event === s.SignalEvent.ERROR)
+                          return (
+                            S.error(
+                              `[1708] [CallId: ${e.id}] SYNC HOLD failed message: ${a.error ? `${a.error.message} code: ${a.error.code}` : ""}`,
+                            ),
+                            void (
+                              null == i ||
+                              i({ error: (0, h.toCallException)(a.error) })
+                            )
+                          );
+                        if (e.mediaFlow !== s.MediaFlow.SFU)
+                          for (let i = 0; i < e.participants.length; i++) {
+                            const n = e.participants[i];
+                            (n.id !== this.user.id ||
+                              n.clientId !== this.clientId) &&
+                              n.clientId &&
                               this.callParticipantsRTCMap[e.id] &&
                               this.callParticipantsRTCMap[e.id][
-                                i.getFullId()
+                                n.getFullId()
                               ] &&
-                              (h.info(
-                                `[1712] [CallId: ${e.id}] Enabling audio on peer connection: ${i.getFullId()}`,
+                              (S.info(
+                                `[1712] [CallId: ${e.id}] Enabling audio on peer connection: ${n.getFullId()}`,
                                 { color: "cyan" },
                               ),
-                              this.callParticipantsRTCMap[e.id][
-                                i.getFullId()
+                              yield this.callParticipantsRTCMap[e.id][
+                                n.getFullId()
                               ].enableAudioOnPeerConnection(t));
-                          })
-                        : this.callParticipantsRTCMap &&
-                          this.callParticipantsRTCMap[e.id] &&
-                          this.callParticipantsRTCMap[e.id][
-                            e.serverParticipant.id
-                          ] &&
-                          (h.info(
-                            `[1712] [CallId: ${e.id}] Enabling audio on peer connection: ${e.serverParticipant.id}`,
-                            { color: "cyan" },
-                          ),
-                          this.callParticipantsRTCMap[e.id][
-                            e.serverParticipant.id
-                          ].enableAudioOnPeerConnection(t)),
-                      e.localParticipant.audioTracks.forEach((e) => {
-                        e.enabled = !t;
-                      }));
-                };
-                return this.signalingClient.sendSignalMessage(
-                  {
-                    mediaFlow: e.mediaFlow,
-                    callId: e.id,
-                    event: t ? s.SignalEvent.MUTE : s.SignalEvent.UNMUTE,
-                    sessionId: e.sessionId,
-                  },
-                  i,
-                );
-              }
+                          }
+                        else
+                          this.callParticipantsRTCMap &&
+                            this.callParticipantsRTCMap[e.id] &&
+                            this.callParticipantsRTCMap[e.id][
+                              e.serverParticipant.id
+                            ] &&
+                            (S.info(
+                              `[1712] [CallId: ${e.id}] Enabling audio on peer connection: ${e.serverParticipant.id}`,
+                              { color: "cyan" },
+                            ),
+                            yield this.callParticipantsRTCMap[e.id][
+                              e.serverParticipant.id
+                            ].enableAudioOnPeerConnection(t));
+                        e.localParticipant.audioTracks.forEach((e) => {
+                          e.enabled = !t;
+                        });
+                      } catch (t) {
+                        (S.error(
+                          `[1725] [CallId: ${e.id}] Failed to enable audio on peer connection: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
+                        ),
+                          null == i || i({ error: (0, h.toCallException)(t) }));
+                      }
+                    });
+                  return this.signalingClient.sendSignalMessage(
+                    {
+                      mediaFlow: e.mediaFlow,
+                      callId: e.id,
+                      event: t ? s.SignalEvent.MUTE : s.SignalEvent.UNMUTE,
+                      sessionId: e.sessionId,
+                    },
+                    a,
+                  );
+                }
+              });
             }
-            sendHold(e, t) {
-              const i = this.activeCalls.find((t) => t.id === e.id);
-              if (i) {
-                this.sendAudioEnable(i, !t);
-                const n = (t) => {
-                  t instanceof u.SceytCallException || t instanceof Error
-                    ? h.error(
-                        `[1741] [CallId: ${e.id}] SYNC HOLD failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+            sendHold(e, t, i) {
+              const n = this.activeCalls.find((t) => t.id === e.id);
+              if (n) {
+                this.sendAudioEnable(n, !t, i);
+                const a = (t) => {
+                  t instanceof p.SceytCallException || t instanceof Error
+                    ? S.error(
+                        `[1741] [CallId: ${e.id}] SYNC HOLD failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
                       )
-                    : t.event === s.SignalEvent.ERROR &&
-                      h.error(
+                    : t.event !== s.SignalEvent.ERROR ||
+                      S.error(
                         `[1745] [CallId: ${e.id}] SYNC HOLD failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                       );
                 };
@@ -3985,7 +4260,7 @@
                     event: t ? s.SignalEvent.HOLD : s.SignalEvent.UNHOLD,
                     sessionId: e.sessionId,
                   },
-                  n,
+                  a,
                 );
               }
             }
@@ -4004,7 +4279,7 @@
                         t
                       ].setStreamsToTransceiver(a[0]);
                 } catch (t) {
-                  h.warn(
+                  S.warn(
                     `[1766] [CallId: ${e.id}] Failed to add track to peer connection: message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
                     { color: "red" },
                   );
@@ -4020,27 +4295,37 @@
                         t
                       ].setStreamsToTransceiver(n[0]);
                 } catch (t) {
-                  h.warn(
+                  S.warn(
                     `[1775] [CallId: ${e.id}] Failed to add track to peer connection: message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
                     { color: "red" },
                   );
                 }
               });
             }
-            switchCallToSfu(e) {
+            switchCallToSfu(e, t) {
               try {
-                const t = (t) => {
-                  if (t instanceof u.SceytCallException || t instanceof Error)
-                    return void h.error(
-                      `[1785] [CallId: ${e.id}] SYNC SWITCH_MEDIA_FLOW signal sent failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                const i = (i) => {
+                  if (i instanceof p.SceytCallException || i instanceof Error)
+                    return (
+                      S.error(
+                        `[1785] [CallId: ${e.id}] SYNC SWITCH_MEDIA_FLOW signal sent failed message: ${i.message} code: ${i instanceof p.SceytCallException ? i.code : ""}`,
+                      ),
+                      void (
+                        null == t || t({ error: (0, h.toCallException)(i) })
+                      )
                     );
-                  t.event === s.SignalEvent.ERROR &&
-                    h.error(
-                      `[1789] [CallId: ${e.id}] SYNC SWITCH_MEDIA_FLOW signal sent failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
+                  if (i.event === s.SignalEvent.ERROR)
+                    return (
+                      S.error(
+                        `[1789] [CallId: ${e.id}] SYNC SWITCH_MEDIA_FLOW signal sent failed message: ${i.error ? `${i.error.message} code: ${i.error.code}` : ""}`,
+                      ),
+                      void (
+                        null == t || t({ error: (0, h.toCallException)(i) })
+                      )
                     );
-                  const i = new a.Participant(e.id);
+                  const n = new a.Participant(e.id);
                   return (
-                    e.setServerParticipant(i),
+                    e.setServerParticipant(n),
                     e.participants.forEach((t) => {
                       ((t.id === this.user.id &&
                         t.clientId === this.clientId) ||
@@ -4051,38 +4336,44 @@
                         t.setShouldResetPeerConnection(!0));
                     }),
                     e.changeMediaFlow(s.MediaFlow.SFU),
-                    h.info(
-                      `[1818] [CallId: ${e.id}] Sending offer to server participant: ${i.getFullId()}`,
+                    S.info(
+                      `[1818] [CallId: ${e.id}] Sending offer to server participant: ${n.getFullId()}`,
                     ),
-                    this.sendOfferPeerToPeer(e, i, (t) => {
-                      t instanceof u.SceytCallException || t instanceof Error
-                        ? h.error(
-                            `[1805] [CallId: ${e.id}] SYNC OFFER signal sent failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                    this.sendOfferPeerToPeer(e, n, (t) => {
+                      t instanceof p.SceytCallException || t instanceof Error
+                        ? S.error(
+                            `[1805] [CallId: ${e.id}] SYNC OFFER signal sent failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
                           )
                         : t.event !== s.SignalEvent.ERROR ||
-                          h.error(
+                          S.error(
                             `[1809] [CallId: ${e.id}] SYNC OFFER signal sent failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                           );
                     }),
                     !0
                   );
                 };
-                (this.signalingClient.sendSignalMessage(
-                  {
-                    mediaFlow: s.MediaFlow.SFU,
-                    callId: e.id,
-                    event: s.SignalEvent.SWITCH_MEDIA_FLOW,
-                    sessionId: e.sessionId,
-                  },
-                  t,
-                ),
-                  h.info(
+                return (
+                  this.signalingClient.sendSignalMessage(
+                    {
+                      mediaFlow: s.MediaFlow.SFU,
+                      callId: e.id,
+                      event: s.SignalEvent.SWITCH_MEDIA_FLOW,
+                      sessionId: e.sessionId,
+                    },
+                    i,
+                  ),
+                  S.info(
                     `[1823] [CallId: ${e.id}] Switched call ${e.id} to SFU`,
                     { color: "light-green" },
-                  ));
+                  ),
+                  { success: !0 }
+                );
               } catch (t) {
-                h.error(
-                  `[1827] [CallId: ${e.id}] Failed to switch ${s.MediaFlow.SFU} message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
+                return (
+                  S.error(
+                    `[1827] [CallId: ${e.id}] Failed to switch ${s.MediaFlow.SFU} message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
+                  ),
+                  { success: !1, error: (0, h.toCallException)(t) }
                 );
               }
             }
@@ -4090,12 +4381,12 @@
               return this.signalingClient.sendSignalMessage(
                 { callId: e, sessionId: t, event: s.SignalEvent.GET_CALL },
                 (t) => {
-                  t instanceof u.SceytCallException || t instanceof Error
-                    ? h.error(
-                        `[1833] [CallId: ${e}] SYNC GET_CALL signal sent failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                  t instanceof p.SceytCallException || t instanceof Error
+                    ? S.error(
+                        `[1833] [CallId: ${e}] SYNC GET_CALL signal sent failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
                       )
-                    : t.event === s.SignalEvent.ERROR &&
-                      h.error(
+                    : t.event !== s.SignalEvent.ERROR ||
+                      S.error(
                         `[1837] [CallId: ${e}] SYNC GET_CALL signal sent failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                       );
                 },
@@ -4106,117 +4397,134 @@
               return this.signalingClient.sendSignalMessage(
                 { callId: "", event: s.SignalEvent.GET_CALL },
                 (e) => {
-                  e instanceof u.SceytCallException || e instanceof Error
-                    ? h.error(
-                        `[1849] [CallId: GLOBAL_LOGS] SYNC GET_CALL signal sent failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                  e instanceof p.SceytCallException || e instanceof Error
+                    ? S.error(
+                        `[1849] [CallId: GLOBAL_LOGS] SYNC GET_CALL signal sent failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                       )
-                    : (e.event === s.SignalEvent.ERROR &&
-                        h.error(
+                    : e.event !== s.SignalEvent.ERROR
+                      ? this.syncActiveCalls(e)
+                      : S.error(
                           "[1853] [CallId: GLOBAL_LOGS] SYNC GET_CALL signal sent failed message: " +
                             (e.error
                               ? `${e.error.message} code: ${e.error.code}`
                               : ""),
-                        ),
-                      this.syncActiveCalls(e));
+                        );
                 },
                 "get_call",
               );
             }
             findOrCreateCall(e, t) {
-              let i = this.activeCalls.find((t) => t.id === e.id),
-                n = !1,
-                l = !1;
-              if (i) {
+              var i, n;
+              let l = this.activeCalls.find((t) => t.id === e.id),
+                r = !1,
+                d = !1;
+              if (l) {
                 if (
-                  (h.info(`[1911] [CallId: ${i.id}] Using existing call`, {
+                  (S.info(`[1911] [CallId: ${l.id}] Using existing call`, {
                     color: "cyan",
                   }),
-                  (n = !0),
-                  !i.participants.find(
+                  (r = !0),
+                  !l.participants.find(
                     (e) =>
                       e.id === this.user.id && e.clientId === this.clientId,
                   ) &&
-                    i.localParticipant.id === this.user.id &&
-                    i.localParticipant.clientId === this.clientId)
+                    l.localParticipant.id === this.user.id &&
+                    l.localParticipant.clientId === this.clientId)
                 ) {
                   const e = (0, c.makeFirstById)(
-                    [...i.participants, i.localParticipant],
+                    [...l.participants, l.localParticipant],
                     this.user.id,
                     this.clientId,
                   );
-                  ((i.participants = e),
-                    i.emitParticipantsAdded(
-                      [i.localParticipant],
+                  ((l.participants = e),
+                    l.emitParticipantsAdded(
+                      [l.localParticipant],
                       s.ParticipantEntryType.ADDED,
                     ));
                 }
+                (e.localAudioTracks &&
+                  (null === (i = e.localAudioTracks) || void 0 === i
+                    ? void 0
+                    : i.length) &&
+                  ((l.localAudioTracks = e.localAudioTracks || []),
+                  l.localParticipant.setAudioTracks(e.localAudioTracks || [])),
+                  e.localVideoTracks &&
+                    (null === (n = e.localVideoTracks) || void 0 === n
+                      ? void 0
+                      : n.length) &&
+                    ((l.localVideoTracks = e.localVideoTracks || []),
+                    l.localParticipant.setVideoTracks(
+                      e.localVideoTracks || [],
+                    )));
               } else {
-                let r = new a.Participant(this.user.id, this.clientId);
-                const d = e.id || (0, p.v4)();
-                h.info(`[1869] [CallId: ${d}] Creating new call`, {
+                let i = new a.Participant(this.user.id, this.clientId);
+                const n = e.id || (0, u.v4)();
+                S.info(`[1869] [CallId: ${n}] Creating new call`, {
                   color: "cyan",
                 });
-                const u = (t || e.participantIds).map((e) => {
-                    let i = new a.Participant(
+                const p = (t || e.participantIds).map((e) => {
+                    let n = new a.Participant(
                       t ? e.id : e,
                       t ? e.clientId : void 0,
                     );
                     return (
                       t &&
-                        (i.setVideoEnabled(e.videoEnabled),
-                        i.setMuted(e.muted),
-                        (i.state = e.state),
+                        (n.setVideoEnabled(e.videoEnabled),
+                        n.setMuted(e.muted),
+                        (n.state = e.state),
                         e.connectionState >
                           s.ParticipantConnectionState.Connected &&
                           e.id !== this.user.id &&
                           e.clientId !== this.clientId &&
-                          (i.connectionState = e.connectionState),
+                          (n.connectionState = e.connectionState),
                         this.user.id !== e.id ||
                           (e.clientId !== this.clientId && e.clientId) ||
-                          ((l = (null == e ? void 0 : e.isCallSilenced) || !1),
-                          (r = i))),
-                      i
+                          ((d = (null == e ? void 0 : e.isCallSilenced) || !1),
+                          (i = n))),
+                      n
                     );
                   }),
                   g = (0, c.makeFirstById)(
-                    [...u, r],
+                    [...p, i],
                     this.user.id,
                     this.clientId,
                   );
-                ((i = new o.Call({
-                  id: d,
+                ((l = new o.Call({
+                  id: n,
                   sessionId: e.sessionId,
                   mediaFlow: e.mediaFlow,
-                  localParticipant: r,
+                  localParticipant: i,
                   participants: g,
                   metadata: e.metadata,
                   createdBy: e.createdBy,
                   chatClient: this.chatClient,
-                  isCallSilenced: l,
+                  isCallSilenced: d,
                 })),
-                  this.activeCalls.push(i),
+                  (l.localAudioTracks = e.localAudioTracks || []),
+                  (l.localVideoTracks = e.localVideoTracks || []),
+                  l.localParticipant.setVideoTracks(e.localVideoTracks || []),
+                  l.localParticipant.setAudioTracks(e.localAudioTracks || []),
+                  this.activeCalls.push(l),
                   this.callEvents.onOngoingCallsUpdated &&
                     this.callEvents.onOngoingCallsUpdated(this.activeCalls),
-                  (n = !1));
+                  (r = !1));
               }
-              return { call: i, answer: n };
+              return { call: l, answer: r };
             }
             processJoinAcknowledgment(e, t, i) {
               var n, a, l, r;
               if (t.event === s.SignalEvent.ERROR)
                 throw (
-                  h.error(
+                  S.error(
                     `[1955] [CallId: ${e.id}] Join failed: message: ${null === (n = t.error) || void 0 === n ? void 0 : n.message} code: ${null === (a = t.error) || void 0 === a ? void 0 : a.code}`,
                   ),
                   this.leaveCall(e, !0, "processJoinAcknowledgment"),
-                  {
-                    code:
-                      null === (l = t.error) || void 0 === l ? void 0 : l.code,
-                    message:
-                      null === (r = t.error) || void 0 === r
-                        ? void 0
-                        : r.message,
-                  }
+                  (0, h.checkCode)(
+                    (null === (l = t.error) || void 0 === l
+                      ? void 0
+                      : l.code) || 0,
+                    null === (r = t.error) || void 0 === r ? void 0 : r.message,
+                  )
                 );
               if (t.event === s.SignalEvent.SUCCESS)
                 return (
@@ -4228,10 +4536,10 @@
                   e
                 );
               throw (
-                h.warn(
+                S.warn(
                   `[1969] [CallId: ${e.id}] Unexpected join event: ${t.event}`,
                 ),
-                new Error(`Unexpected event type: ${t.event}`)
+                (0, h.checkCode)(4e3, `Unexpected event type: ${t.event}`)
               );
             }
             configureRTCServers(e, t, i) {
@@ -4270,17 +4578,17 @@
                           t.getFullId(),
                           e.localParticipant.getFullId(),
                         ) &&
-                        (h.info(
+                        (S.info(
                           `[2008] [CallId: ${e.id}] Sending offer to participant: ${t.getFullId()}`,
                         ),
                         this.sendOfferPeerToPeer(e, t, (t) => {
-                          t instanceof u.SceytCallException ||
+                          t instanceof p.SceytCallException ||
                           t instanceof Error
-                            ? h.error(
-                                `[2005] [CallId: ${e.id}] SYNC OFFER failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                            ? S.error(
+                                `[2005] [CallId: ${e.id}] SYNC OFFER failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
                               )
-                            : t.event === s.SignalEvent.ERROR &&
-                              h.error(
+                            : t.event !== s.SignalEvent.ERROR ||
+                              S.error(
                                 `[2010] [CallId: ${e.id}] SYNC OFFER failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                               );
                         }));
@@ -4288,23 +4596,23 @@
             }
             setupSFUConnection(e, t, i) {
               const n = new a.Participant(e.id);
-              h.info(
+              S.info(
                 `[2005] [CallId: ${e.id}] [serverParticipant.id:${n.getFullId()}] Adding server participant to RTC map`,
                 { color: "cyan" },
               );
               try {
                 e.setServerParticipant(n);
                 const a = (n) => {
-                  n instanceof u.SceytCallException || n instanceof Error
-                    ? h.error(
-                        `[2011] [CallId: ${e.id}] SYNC OFFER failed message: ${n.message} code: ${n instanceof u.SceytCallException ? n.code : ""}`,
+                  n instanceof p.SceytCallException || n instanceof Error
+                    ? S.error(
+                        `[2011] [CallId: ${e.id}] SYNC OFFER failed message: ${n.message} code: ${n instanceof p.SceytCallException ? n.code : ""}`,
                       )
                     : (n.event === s.SignalEvent.ERROR &&
-                        h.error(
+                        S.error(
                           `[2015] [CallId: ${e.id}] SYNC OFFER failed message: ${n.error ? `${n.error.message} code: ${n.error.code}` : ""}`,
                         ),
                       n.event !== s.SignalEvent.ERROR &&
-                        (h.info(
+                        (S.info(
                           `[2019] [CallId: ${e.id}] offerAck: ${JSON.stringify(n)}`,
                           { color: "cyan" },
                         ),
@@ -4333,13 +4641,13 @@
                               ));
                           else {
                             const a = (t) => {
-                              t instanceof u.SceytCallException ||
+                              t instanceof p.SceytCallException ||
                               t instanceof Error
-                                ? h.error(
-                                    `[2023] [CallId: ${e.id}] SYNC CONNECT failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                                ? S.error(
+                                    `[2023] [CallId: ${e.id}] SYNC CONNECT failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
                                   )
-                                : t.event === s.SignalEvent.ERROR &&
-                                  h.error(
+                                : t.event !== s.SignalEvent.ERROR ||
+                                  S.error(
                                     `[2028] [CallId: ${e.id}] SYNC CONNECT failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                                   );
                             };
@@ -4361,16 +4669,16 @@
                           }
                         })));
                 };
-                (h.info(
+                (S.info(
                   `[2067] [CallId: ${e.id}] Sending offer to server participant: ${n.getFullId()}`,
                 ),
                   this.sendOfferPeerToPeer(e, n, a));
               } catch (t) {
                 throw (
-                  h.error(
+                  S.error(
                     `[2049] [CallId: ${e.id}] SFU setup error: message: ${t instanceof Error ? t.message : JSON.stringify(t)}`,
                   ),
-                  t
+                  (0, h.toCallException)(t)
                 );
               }
             }
@@ -4449,7 +4757,7 @@
                       ));
                   }
                 }),
-                h.info(
+                S.info(
                   `[2098] [CallId: ${e.id}] Processed participants - Added and Updated`,
                   { color: "cyan" },
                 ));
@@ -4476,77 +4784,141 @@
                     this.processJoinAcknowledgment(e, t, n))
                   : this.leaveCall(e, !0, "processJoinCall"));
             }
-            startCall(e, t, i) {
-              const a = t.mediaFlow,
-                l = e.participants
+            startCall(e, t, i, a) {
+              var l;
+              const r = t.mediaFlow,
+                o = e.participants
                   .filter(
                     (e) =>
                       !(e.id === this.user.id && e.clientId === this.clientId),
                   )
                   .map((e) => e.serialize());
-              return (
-                e.mediaFlow !== s.MediaFlow.SFU &&
-                  e.localParticipant.updateConnectionState(
-                    s.ParticipantConnectionState.Connecting,
-                    e.id,
-                  ),
-                this.setupMediaStream(e).then(({ audioTracks: t }) => {
-                  e.state != s.CallState.Idle
-                    ? (e.emitAudioTrackAdded(e.localParticipant, t[0]),
-                      this.joinToCall(
-                        {
-                          mediaFlow: a,
-                          callId: e.id,
-                          sessionId: e.sessionId,
-                          participants: i ? [] : l,
-                          metadata: e.metadata,
-                        },
-                        (t) =>
-                          n(this, void 0, void 0, function* () {
-                            t instanceof u.SceytCallException ||
-                            t instanceof Error
-                              ? h.error(
-                                  `[2137] [CallId: ${e.id}] SYNC JOIN failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
-                                )
-                              : t.event !== s.SignalEvent.ERROR
-                                ? this.processJoinCall(e, t, "from joinCall")
-                                : h.error(
-                                    `[2141] [CallId: ${e.id}] SYNC JOIN failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
-                                  );
-                          }),
-                      ))
-                    : t.forEach((e) => {
+              e.mediaFlow !== s.MediaFlow.SFU &&
+                e.localParticipant.updateConnectionState(
+                  s.ParticipantConnectionState.Connecting,
+                  e.id,
+                );
+              const c =
+                  "true" ===
+                  (null === (l = e.metadata) || void 0 === l
+                    ? void 0
+                    : l.videoCall),
+                d = (t, l) => {
+                  if (e.state == s.CallState.Idle)
+                    return (
+                      t.forEach((e) => {
                         e.stop();
-                      });
-                }),
+                      }),
+                      void (
+                        null == a ||
+                        a({
+                          error: (0, h.checkCode)(
+                            5002,
+                            "Call was ended before media setup completed",
+                          ),
+                        })
+                      )
+                    );
+                  (e.emitAudioTrackAdded(e.localParticipant, t[0]),
+                    c &&
+                      l &&
+                      l.length > 0 &&
+                      (e.emitVideoTrackAdded(e.localParticipant, l[0]),
+                      e.localParticipant.setVideoTracks(l),
+                      (e.localVideoTracks = l),
+                      e.setVideoDeviceId(l[0].getSettings().deviceId || null)),
+                    e.localParticipant.setAudioTracks(t),
+                    (e.localAudioTracks = t),
+                    this.joinToCall(
+                      {
+                        mediaFlow: r,
+                        callId: e.id,
+                        sessionId: e.sessionId,
+                        participants: i ? [] : o,
+                        metadata: e.metadata,
+                      },
+                      (t) =>
+                        n(this, void 0, void 0, function* () {
+                          var i;
+                          return t instanceof p.SceytCallException ||
+                            t instanceof Error
+                            ? (S.error(
+                                `[2137] [CallId: ${e.id}] SYNC JOIN failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
+                              ),
+                              e.setState(s.CallState.Closed, "joinCall failed"),
+                              void (
+                                null == a ||
+                                a({ error: (0, h.toCallException)(t) })
+                              ))
+                            : t.event === s.SignalEvent.ERROR
+                              ? (S.error(
+                                  `[2141] [CallId: ${e.id}] SYNC JOIN failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
+                                ),
+                                void (
+                                  null == a ||
+                                  a({
+                                    error: (0, h.checkCode)(
+                                      5003,
+                                      (null === (i = t.error) || void 0 === i
+                                        ? void 0
+                                        : i.message) || "Unknown error",
+                                    ),
+                                  })
+                                ))
+                              : void this.processJoinCall(
+                                  e,
+                                  t,
+                                  "from joinCall",
+                                );
+                        }),
+                    ));
+                };
+              return (
+                (e.localAudioTracks && e.localAudioTracks.length > 0) ||
+                (e.localVideoTracks && e.localVideoTracks.length > 0)
+                  ? !(e.localAudioTracks && e.localAudioTracks.length > 0) &&
+                    e.localVideoTracks &&
+                    e.localVideoTracks.length > 0
+                    ? this.setupMediaStream(e).then(({ audioTracks: e }) => {
+                        d(e, t.localVideoTracks || []);
+                      })
+                    : !e.localAudioTracks ||
+                        (e.localVideoTracks && e.localVideoTracks.length > 0)
+                      ? d(e.localAudioTracks || [], e.localVideoTracks || [])
+                      : d(t.localAudioTracks || [])
+                  : this.setupMediaStream(e).then(({ audioTracks: e }) => {
+                      d(e);
+                    }),
                 e
               );
             }
-            joinCall(e) {
-              let t = null;
+            joinCall(e, t) {
+              let i = null;
               try {
-                h.info(
+                S.info(
                   "[2159] [CallId: GLOBAL_LOGS] joinCall, start new call",
                   { color: "blue" },
                 );
-                const { call: i, answer: n } = this.findOrCreateCall(e);
-                if (!i.setState(s.CallState.Connecting, "joinCall"))
-                  throw new Error(
-                    `Failed to set call state from ${i.state} to connecting`,
-                  );
-                return (
-                  (i.localParticipant.state = s.ParticipantState.Joined),
-                  (i.localParticipant.clientId = this.clientId),
-                  (t = this.startCall(i, e, n)),
-                  i
-                );
+                const { call: n, answer: a } = this.findOrCreateCall(e);
+                return n.setState(s.CallState.Connecting, "joinCall")
+                  ? ((n.localParticipant.state = s.ParticipantState.Joined),
+                    (n.localParticipant.clientId = this.clientId),
+                    (i = this.startCall(n, e, a, t)),
+                    { success: !0, data: n })
+                  : {
+                      success: !1,
+                      error: (0, h.checkCode)(
+                        5001,
+                        `Failed to set call state from ${n.state} to connecting`,
+                      ),
+                    };
               } catch (e) {
                 return (
-                  h.error(
-                    `[2173] [CallId: ${null == t ? void 0 : t.id}] Join call failed: ${e.message || JSON.stringify(e)}`,
+                  S.error(
+                    `[2173] [CallId: ${null == i ? void 0 : i.id}] Join call failed: ${e.message || JSON.stringify(e)}`,
                     { color: "red" },
                   ),
-                  t
+                  { success: !1, error: (0, h.toCallException)(e) }
                 );
               }
             }
@@ -4555,13 +4927,13 @@
                 (e.createdBy = t.createdBy),
                 (e.sessionId = t.sessionId),
                 (e.id = t.id),
-                h.info(
+                S.info(
                   `[2187] [CallId: ${e.id}] Updated call metadata for call ${e.id}`,
                   { color: "light-blue" },
                 ));
             }
             syncParticipants(e, t) {
-              (h.info(
+              (S.info(
                 `[2198] [CallId: ${e.id}] Syncing participants for call ${e.id}`,
                 { color: "light-blue" },
               ),
@@ -4575,7 +4947,7 @@
                   );
                   return (
                     n ||
-                      (h.info(
+                      (S.info(
                         `[2202] [CallId: ${e.id}] Removing participant ${i.id} who is no longer in the call`,
                         { color: "light-blue" },
                       ),
@@ -4584,7 +4956,7 @@
                     !!n
                   );
                 })),
-                h.info(
+                S.info(
                   `[2216] [CallId: ${e.id}] Syncing participants for call ${e.id}`,
                   { color: "light-blue" },
                 ));
@@ -4597,7 +4969,7 @@
                     ),
                 );
                 if (
-                  (h.info(
+                  (S.info(
                     `[2219] [CallId: ${e.id}] Syncing participants for call ${e.id}`,
                     { color: "light-blue" },
                   ),
@@ -4626,7 +4998,7 @@
                     t.getFullId() === e.localParticipant.getFullId() &&
                       (e.localParticipant = t),
                     this.syncParticipantMediaState(e, t, i),
-                    h.info(
+                    S.info(
                       `[2254] [CallId: ${e.id}] Syncing existing participants: ${t.getFullId()} for call ${e.id}`,
                       { color: "light-blue" },
                     ));
@@ -4635,7 +5007,7 @@
                   ((t.state = i.state),
                     e.addParticipantToList(t),
                     this.syncParticipantMediaState(e, t, i),
-                    h.info(
+                    S.info(
                       `[2263] [CallId: ${e.id}] Syncing no existing participants: ${t.getFullId()} for call ${e.id}`,
                       { color: "light-blue" },
                     ),
@@ -4661,7 +5033,7 @@
                   r = !!i.hasOwnProperty("onHold") && i.onHold,
                   s = !!i.hasOwnProperty("isCallSilenced") && i.isCallSilenced;
                 (n !== t.muted &&
-                  (h.info(
+                  (S.info(
                     `[2287] [CallId: ${e.id}] Participant ${t.getFullId()} audio state changed: ${t.muted} -> ${n}`,
                     { color: "light-blue" },
                   ),
@@ -4671,7 +5043,7 @@
                     : e.emitParticipantEvent(t, "Unmute")),
                   l === t.videoEnabled ||
                     a ||
-                    (h.info(
+                    (S.info(
                       `[2296] [CallId: ${e.id}] Participant ${t.getFullId()} video state changed: ${t.videoEnabled} -> ${l}`,
                       { color: "light-blue" },
                     ),
@@ -4680,7 +5052,7 @@
                       ? e.emitParticipantEvent(t, "VideoEnabled")
                       : e.emitParticipantEvent(t, "VideoDisabled")),
                   a !== t.screenSharing &&
-                    (h.info(
+                    (S.info(
                       `[2307] [CallId: ${e.id}] Participant ${t.getFullId()} screen sharing state changed: ${t.screenSharing} -> ${a}`,
                       { color: "light-blue" },
                     ),
@@ -4689,7 +5061,7 @@
                       ? e.emitParticipantEvent(t, "ScreenSharingStarted")
                       : e.emitParticipantEvent(t, "ScreenSharingStopped")),
                   r !== t.onHold &&
-                    (h.info(
+                    (S.info(
                       `[2317] [CallId: ${e.id}] Participant ${t.getFullId()} hold state changed: ${t.onHold} -> ${r}`,
                       { color: "light-blue" },
                     ),
@@ -4698,7 +5070,7 @@
                       ? e.emitParticipantEvent(t, "Hold")
                       : e.emitParticipantEvent(t, "Unhold")),
                   s !== !!t.isCallSilenced &&
-                    (h.info(
+                    (S.info(
                       `[2327] [CallId: ${e.id}] Participant ${t.getFullId()} ring allowed state changed: ${t.isCallSilenced} -> ${s}`,
                       { color: "light-blue" },
                     ),
@@ -4707,7 +5079,7 @@
             }
             handleNewParticipant(e, t) {
               if (
-                (h.info(
+                (S.info(
                   `[2333] [CallId: ${e.id}] Call media flow: ${e.mediaFlow}`,
                   { color: "light-blue" },
                 ),
@@ -4723,18 +5095,18 @@
                       s.ParticipantConnectionState.Reconnecting)
                 ) {
                   const i = (t) => {
-                    t instanceof u.SceytCallException || t instanceof Error
-                      ? h.error(
-                          `[2341] [CallId: ${e.id}] SYNC OFFER signal sent failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                    t instanceof p.SceytCallException || t instanceof Error
+                      ? S.error(
+                          `[2341] [CallId: ${e.id}] SYNC OFFER signal sent failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
                           { color: "red" },
                         )
-                      : t.event === s.SignalEvent.ERROR &&
-                        h.error(
+                      : t.event !== s.SignalEvent.ERROR ||
+                        S.error(
                           `[2345] [CallId: ${e.id}] SYNC OFFER signal sent failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                           { color: "red" },
                         );
                   };
-                  (h.info(
+                  (S.info(
                     `[2370] [CallId: ${e.id}] Sending offer to participant: ${t.getFullId()}`,
                   ),
                     e.mediaFlow === s.MediaFlow.P2P &&
@@ -4763,13 +5135,13 @@
                 t.connectionState !== s.ParticipantConnectionState.Reconnecting
               ) {
                 const i = (t) => {
-                  t instanceof u.SceytCallException || t instanceof Error
-                    ? h.error(
-                        `[2354] [CallId: ${e.id}] SYNC CONNECT signal sent failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                  t instanceof p.SceytCallException || t instanceof Error
+                    ? S.error(
+                        `[2354] [CallId: ${e.id}] SYNC CONNECT signal sent failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
                         { color: "red" },
                       )
                     : t.event !== s.SignalEvent.ERROR ||
-                      h.error(
+                      S.error(
                         `[2358] [CallId: ${e.id}] SYNC CONNECT signal sent failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                         { color: "red" },
                       );
@@ -4797,13 +5169,13 @@
                 let i = t.participants.find((t) => t.getFullId() === e.from);
                 i &&
                   this.sendOfferPeerToPeer(t, i, (e) => {
-                    e instanceof u.SceytCallException || e instanceof Error
-                      ? h.error(
-                          `[2417] [CallId: ${t.id}] SYNC OFFER signal sent failed message: ${e.message} code: ${e instanceof u.SceytCallException ? e.code : ""}`,
+                    e instanceof p.SceytCallException || e instanceof Error
+                      ? S.error(
+                          `[2417] [CallId: ${t.id}] SYNC OFFER signal sent failed message: ${e.message} code: ${e instanceof p.SceytCallException ? e.code : ""}`,
                           { color: "red" },
                         )
-                      : e.event === s.SignalEvent.ERROR &&
-                        h.error(
+                      : e.event !== s.SignalEvent.ERROR ||
+                        S.error(
                           `[2421] [CallId: ${t.id}] SYNC OFFER signal sent failed message: ${e.error ? `${e.error.message} code: ${e.error.code}` : ""}`,
                           { color: "red" },
                         );
@@ -4811,24 +5183,24 @@
               }
             }
             handleMediaFlowSwitch(e) {
-              (h.info(
+              (S.info(
                 `[2375] [CallId: ${e.id}] Switching call ${e.id} from P2P to SFU`,
                 { color: "light-blue" },
               ),
                 e.changeMediaFlow(s.MediaFlow.SFU));
               const t = new a.Participant(e.id);
               (e.setServerParticipant(t),
-                h.info(
+                S.info(
                   `[2395] [CallId: ${e.id}] Sending offer to server participant: ${t.getFullId()}`,
                 ),
                 this.sendOfferPeerToPeer(e, t, (t) => {
-                  t instanceof u.SceytCallException || t instanceof Error
-                    ? h.error(
-                        `[2386] [CallId: ${e.id}] SYNC OFFER signal sent failed message: ${t.message} code: ${t instanceof u.SceytCallException ? t.code : ""}`,
+                  t instanceof p.SceytCallException || t instanceof Error
+                    ? S.error(
+                        `[2386] [CallId: ${e.id}] SYNC OFFER signal sent failed message: ${t.message} code: ${t instanceof p.SceytCallException ? t.code : ""}`,
                         { color: "red" },
                       )
-                    : t.event === s.SignalEvent.ERROR &&
-                      h.error(
+                    : t.event !== s.SignalEvent.ERROR ||
+                      S.error(
                         `[2390] [CallId: ${e.id}] SYNC OFFER signal sent failed message: ${t.error ? `${t.error.message} code: ${t.error.code}` : ""}`,
                         { color: "red" },
                       );
@@ -4838,7 +5210,7 @@
                 }));
             }
           }
-          t.InternalCallHandler = S;
+          t.InternalCallHandler = C;
         },
         787: (e, t, i) => {
           (Object.defineProperty(t, "__esModule", { value: !0 }),
@@ -4948,11 +5320,11 @@
           (Object.defineProperty(t, "__esModule", { value: !0 }),
             (t.RecentCallQueryBuilder = void 0));
           const n = i(578),
-            a = i(681),
-            l = i(650),
-            r = i(816),
-            s = i(343);
-          class o extends r.QueryBuilder {
+            a = i(650),
+            l = i(816),
+            r = i(343),
+            s = i(228);
+          class o extends l.QueryBuilder {
             constructor() {
               (super(...arguments),
                 (this.order = n.CDRRequestOrder.ASC),
@@ -4974,15 +5346,12 @@
                 (this.setOrder = (e) => ((this.order = e), this)),
                 (this.setDirection = (e) => ((this.direction = e), this)),
                 (this.build = () => {
-                  const e = l.InternalCallHandler.getInstance();
+                  const e = a.InternalCallHandler.getInstance();
                   this.chatClient = e.chatClient;
                   try {
-                    return new s.RecentCallQuery(this);
+                    return new r.RecentCallQuery(this);
                   } catch (e) {
-                    throw new a.SceytChatError(
-                      null == e ? void 0 : e.message,
-                      null == e ? void 0 : e.code,
-                    );
+                    throw (0, s.toCallException)(e);
                   }
                 }));
             }
@@ -5025,8 +5394,9 @@
           (Object.defineProperty(t, "__esModule", { value: !0 }),
             (t.RecentCallQuery = void 0));
           const a = i(578),
-            l = i(681),
-            r = (0, i(645).createLogger)("RecentCallQuery");
+            l = i(645),
+            r = i(228),
+            s = (0, l.createLogger)("RecentCallQuery");
           t.RecentCallQuery = class {
             constructor(e) {
               ((this.count = 10),
@@ -5040,8 +5410,8 @@
                   n(this, void 0, void 0, function* () {
                     if (this.loading)
                       throw (
-                        r.info("QUERY_IN_PROGRESS"),
-                        new l.SceytChatError("QUERY_IN_PROGRESS", 9908)
+                        s.info("QUERY_IN_PROGRESS"),
+                        (0, r.checkCode)(5001, "QUERY_IN_PROGRESS")
                       );
                     if (this.hasNext) {
                       this.loading = !0;
@@ -5176,8 +5546,9 @@
               t.CODEC_NAME_TO_VIDEO_CODEC =
                 void 0));
           const n = i(645),
-            a = i(799),
-            l = (0, n.createLogger)("SdpConverter");
+            a = i(228),
+            l = i(799),
+            r = (0, n.createLogger)("SdpConverter");
           ((t.CODEC_NAME_TO_VIDEO_CODEC = ["vp8", "rtx", "red"]),
             (t.CODEC_NAME_TO_AUDIO_CODEC = ["opus", "red"]),
             (t.CODEC_NAME_TO_AUDIO_CODEC_S2W = [
@@ -5186,21 +5557,21 @@
               "pcmu",
               "pcma",
             ]));
-          class r {
+          class s {
             static parseToSdpData(
               e,
               i = t.CODEC_NAME_TO_VIDEO_CODEC,
               n = t.CODEC_NAME_TO_AUDIO_CODEC,
             ) {
-              var a, l, s;
+              var a, l, r;
               const o = [],
                 c = e
                   .split("\n")
                   .map((e) => e.trim())
                   .filter((e) => e.length > 0),
-                d = r.extractSessionId(c) || "",
-                p = r.extractSessionVersion(c) || 0,
-                u = r.extractOriginAddress(c) || "127.0.0.1",
+                d = s.extractSessionId(c) || "",
+                u = s.extractSessionVersion(c) || 0,
+                p = s.extractOriginAddress(c) || "127.0.0.1",
                 g =
                   (null === (a = c.find((e) => e.startsWith("s="))) ||
                   void 0 === a
@@ -5209,56 +5580,56 @@
                 h =
                   (null ===
                     (l = c.find(
-                      (e, t) => e.startsWith("c=") && !r.inMediaSection(c, t),
+                      (e, t) => e.startsWith("c=") && !s.inMediaSection(c, t),
                     )) || void 0 === l
                     ? void 0
                     : l.split(" ").slice(2)[0]) || "",
                 S =
                   (null ===
-                    (s = r.firstValueStartingWith(c, "a=msid-semantic:")) ||
-                  void 0 === s
+                    (r = s.firstValueStartingWith(c, "a=msid-semantic:")) ||
+                  void 0 === r
                     ? void 0
-                    : s.trim()) || "WMS",
-                C = r.parseBundleGroup(c),
-                f = c.findIndex((e) => e.startsWith("m=")),
-                v = f > 0 ? c.slice(0, f) : c,
-                I = r.firstValueStartingWith(v, "a=ice-ufrag:") || "",
-                E = r.firstValueStartingWith(v, "a=ice-pwd:") || "",
-                m = r.parseIceOptions(v),
-                P = r.parseFingerprint(v),
-                $ = r.parseSetup(v),
-                y = v.some((e) => "a=ice-lite" === e),
-                T = v.some((e) => "a=extmap-allow-mixed" === e);
+                    : r.trim()) || "WMS",
+                C = s.parseBundleGroup(c),
+                v = c.findIndex((e) => e.startsWith("m=")),
+                f = v > 0 ? c.slice(0, v) : c,
+                I = s.firstValueStartingWith(f, "a=ice-ufrag:") || "",
+                E = s.firstValueStartingWith(f, "a=ice-pwd:") || "",
+                m = s.parseIceOptions(f),
+                P = s.parseFingerprint(f),
+                $ = s.parseSetup(f),
+                T = f.some((e) => "a=ice-lite" === e),
+                y = f.some((e) => "a=extmap-allow-mixed" === e);
               return {
                 sessionId: d,
-                sessionVersion: p,
+                sessionVersion: u,
                 bundleGroup: C,
                 iceUfrag: I,
                 icePwd: E,
                 iceOptions: m,
                 fingerprint: P,
                 setup: $,
-                media: r.parseMediaSections(c, o, i, n),
+                media: s.parseMediaSections(c, o, i, n),
                 sessionName: g,
-                originAddress: u,
+                originAddress: p,
                 connectionAddress: h,
                 msidSemantic: S,
-                iceLite: y,
-                extmapAllowMixed: T,
+                iceLite: T,
+                extmapAllowMixed: y,
                 stringPool: o,
               };
             }
             static reconstructFromSDPData(e) {
-              var t, i, n, a, s, o;
+              var t, i, n, l, o, c;
               try {
-                const c = [];
+                const d = [];
                 if (
-                  (c.push("v=0\r\n"),
-                  c.push(
+                  (d.push("v=0\r\n"),
+                  d.push(
                     `o=- ${e.sessionId} ${e.sessionVersion} IN IP4 ${e.originAddress}\r\n`,
                   ),
-                  c.push(`s=${e.sessionName}\r\n`),
-                  c.push("t=0 0\r\n"),
+                  d.push(`s=${e.sessionName}\r\n`),
+                  d.push("t=0 0\r\n"),
                   (null ===
                     (i =
                       null === (t = e.fingerprint) || void 0 === t
@@ -5266,8 +5637,8 @@
                         : t.hashValue) || void 0 === i
                     ? void 0
                     : i.length) > 0 &&
-                    c.push(
-                      `a=fingerprint:${r.fingerprintToString(e.fingerprint)}\r\n`,
+                    d.push(
+                      `a=fingerprint:${s.fingerprintToString(e.fingerprint)}\r\n`,
                     ),
                   (null === (n = null == e ? void 0 : e.bundleGroup) ||
                   void 0 === n
@@ -5275,48 +5646,54 @@
                     : n.length) > 0)
                 ) {
                   const t = e.media.map((e) => e.mid).join(" ");
-                  c.push(`a=group:BUNDLE ${t}\r\n`);
+                  d.push(`a=group:BUNDLE ${t}\r\n`);
                 }
-                ((null === (a = null == e ? void 0 : e.iceOptions) ||
-                void 0 === a
+                ((null === (l = null == e ? void 0 : e.iceOptions) ||
+                void 0 === l
                   ? void 0
-                  : a.length) > 0 &&
-                  c.push(`a=ice-options:${e.iceOptions.join(" ")}\r\n`),
+                  : l.length) > 0 &&
+                  d.push(`a=ice-options:${e.iceOptions.join(" ")}\r\n`),
                   (null == e ? void 0 : e.extmapAllowMixed) &&
-                    c.push("a=extmap-allow-mixed\r\n"),
-                  (null === (s = null == e ? void 0 : e.msidSemantic) ||
-                  void 0 === s
+                    d.push("a=extmap-allow-mixed\r\n"),
+                  (null === (o = null == e ? void 0 : e.msidSemantic) ||
+                  void 0 === o
                     ? void 0
-                    : s.length) > 0 &&
-                    c.push(`a=msid-semantic: ${e.msidSemantic}\r\n`),
-                  (null == e ? void 0 : e.iceLite) && c.push("a=ice-lite\r\n"),
-                  null === (o = null == e ? void 0 : e.media) ||
-                    void 0 === o ||
-                    o.forEach((t) => {
-                      r.buildMediaSection(c, t, e);
+                    : o.length) > 0 &&
+                    d.push(`a=msid-semantic: ${e.msidSemantic}\r\n`),
+                  (null == e ? void 0 : e.iceLite) && d.push("a=ice-lite\r\n"),
+                  null === (c = null == e ? void 0 : e.media) ||
+                    void 0 === c ||
+                    c.forEach((t) => {
+                      s.buildMediaSection(d, t, e);
                     }));
-                const d = c.join("");
+                const u = d.join("");
                 if (
-                  (l.debug(
-                    `Reconstructed SDP (${null == d ? void 0 : d.length} bytes)`,
+                  (r.debug(
+                    `Reconstructed SDP (${null == u ? void 0 : u.length} bytes)`,
                   ),
-                  !(null == d ? void 0 : d.includes("m=")))
+                  !(null == u ? void 0 : u.includes("m=")))
                 )
-                  throw new Error("Reconstructed SDP missing media lines");
+                  throw (0, a.checkCode)(
+                    4e3,
+                    "Reconstructed SDP missing media lines",
+                  );
                 if (
-                  !(null == d ? void 0 : d.includes("a=ice-ufrag:")) &&
-                  !(null == d ? void 0 : d.includes("a=ice-pwd:"))
+                  !(null == u ? void 0 : u.includes("a=ice-ufrag:")) &&
+                  !(null == u ? void 0 : u.includes("a=ice-pwd:"))
                 )
-                  throw new Error("Reconstructed SDP missing ICE credentials");
-                return d;
+                  throw (0, a.checkCode)(
+                    4e3,
+                    "Reconstructed SDP missing ICE credentials",
+                  );
+                return u;
               } catch (e) {
                 throw (
-                  l.error(
+                  r.error(
                     `[647] [CallId: GLOBAL_LOGS] Failed to reconstruct SDP: ${e.message}`,
                     { color: "red" },
                   ),
-                  l.error(e, { color: "red" }),
-                  e
+                  r.error(e, { color: "red" }),
+                  (0, a.toCallException)(e)
                 );
               }
             }
@@ -5359,19 +5736,19 @@
                   switch (e[0].toLowerCase()) {
                     case "sha-256":
                     default:
-                      i = a.HashFunction.SHA256;
+                      i = l.HashFunction.SHA256;
                       break;
                     case "sha-1":
-                      i = a.HashFunction.SHA1;
+                      i = l.HashFunction.SHA1;
                       break;
                     case "sha-384":
-                      i = a.HashFunction.SHA384;
+                      i = l.HashFunction.SHA384;
                       break;
                     case "sha-512":
-                      i = a.HashFunction.SHA512;
+                      i = l.HashFunction.SHA512;
                       break;
                     case "md5":
-                      i = a.HashFunction.MD5;
+                      i = l.HashFunction.MD5;
                   }
                   const n = e[1].replace(/:/g, "");
                   return {
@@ -5385,7 +5762,7 @@
                 }
               }
               return {
-                hashFunc: a.HashFunction.SHA256,
+                hashFunc: l.HashFunction.SHA256,
                 hashValue: new Uint8Array(0),
               };
             }
@@ -5393,11 +5770,11 @@
               const t = e.find((e) => e.startsWith("a=setup:"));
               switch (null == t ? void 0 : t.substring(8).toLowerCase()) {
                 case "active":
-                  return a.DTLSSetup.ACTIVE;
+                  return l.DTLSSetup.ACTIVE;
                 case "passive":
-                  return a.DTLSSetup.PASSIVE;
+                  return l.DTLSSetup.PASSIVE;
                 default:
-                  return a.DTLSSetup.ACTPASS;
+                  return l.DTLSSetup.ACTPASS;
               }
             }
             static firstValueStartingWith(e, t) {
@@ -5417,47 +5794,47 @@
                 .filter(({ line: e }) => e.startsWith("m="))
                 .map(({ index: e }) => e);
               return a
-                .map((l, s) => {
-                  const o = s < a.length - 1 ? a[s + 1] : e.length;
-                  return r.parseMediaSection(e.slice(l, o), t, i, n);
+                .map((l, r) => {
+                  const o = r < a.length - 1 ? a[r + 1] : e.length;
+                  return s.parseMediaSection(e.slice(l, o), t, i, n);
                 })
                 .filter((e) => null !== e);
             }
             static parseMediaSection(e, t, i, n) {
-              var s;
+              var a;
               try {
                 const i = e[0].substring(2).split(" ");
                 let n;
                 switch (i[0].toLowerCase()) {
                   case "audio":
-                    n = a.MediaType.AUDIO;
+                    n = l.MediaType.AUDIO;
                     break;
                   case "video":
-                    n = a.MediaType.VIDEO;
+                    n = l.MediaType.VIDEO;
                     break;
                   default:
-                    n = a.MediaType.MEDIA_TYPE_UNSPECIFIED;
+                    n = l.MediaType.MEDIA_TYPE_UNSPECIFIED;
                 }
-                if (n === a.MediaType.MEDIA_TYPE_UNSPECIFIED)
-                  return (l.warn(`Skipping unknown media type: ${i[0]}`), null);
+                if (n === l.MediaType.MEDIA_TYPE_UNSPECIFIED)
+                  return (r.warn(`Skipping unknown media type: ${i[0]}`), null);
                 const o = parseInt(i[1] || "9", 10) || 9,
                   c = i
                     .slice(3)
                     .map((e) => parseInt(e, 10))
                     .filter((e) => !isNaN(e)),
-                  d = r.firstValueStartingWith(e, "a=mid:") || "",
-                  p = r.parseDirection(e),
-                  u = r.firstValueStartingWith(e, "a=msid:"),
-                  [g, h, S] = r.parseMSID(u || null),
+                  d = s.firstValueStartingWith(e, "a=mid:") || "",
+                  u = s.parseDirection(e),
+                  p = s.firstValueStartingWith(e, "a=msid:"),
+                  [g, h, S] = s.parseMSID(p || null),
                   C = e.some((e) => "a=rtcp-mux" === e),
-                  f = e.some((e) => "a=rtcp-rsize" === e),
-                  v = e.some((e) => "a=end-of-candidates" === e),
+                  v = e.some((e) => "a=rtcp-rsize" === e),
+                  f = e.some((e) => "a=end-of-candidates" === e),
                   I =
-                    (null === (s = e.find((e) => e.startsWith("c="))) ||
-                    void 0 === s
+                    (null === (a = e.find((e) => e.startsWith("c="))) ||
+                    void 0 === a
                       ? void 0
-                      : s.split(" ")[2]) || "",
-                  E = r.firstValueStartingWith(e, "a=rtcp:") || "",
+                      : a.split(" ")[2]) || "",
+                  E = s.firstValueStartingWith(e, "a=rtcp:") || "",
                   m = new Map(),
                   P = [];
                 (c.forEach((e) => {
@@ -5476,8 +5853,8 @@
                         const e = parseInt(t[0], 10);
                         if (!isNaN(e)) {
                           const i = t[1];
-                          r.dynamicCodecNames.set(e, i);
-                          const n = r.CODEC_NAME_TO_MAP_KEY.get(i) || 0;
+                          s.dynamicCodecNames.set(e, i);
+                          const n = s.CODEC_NAME_TO_MAP_KEY.get(i) || 0;
                           if (m.has(e)) {
                             const t = m.get(e);
                             m.set(e, {
@@ -5496,7 +5873,7 @@
                       if (2 === t.length) {
                         const e = parseInt(t[0], 10);
                         if (!isNaN(e) && m.has(e)) {
-                          const i = r.parseFmtp(t[1]),
+                          const i = s.parseFmtp(t[1]),
                             n = m.get(e);
                           m.set(e, {
                             codecName: n.codecName,
@@ -5516,7 +5893,7 @@
                           let i = "";
                           for (let e = 1; e < t.length; e++)
                             i += t[e] + (e !== t.length - 1 ? " " : "");
-                          const n = r.RTCP_FEEDBACK_STRING_TO_ID.get(i);
+                          const n = s.RTCP_FEEDBACK_STRING_TO_ID.get(i);
                           if (void 0 !== n && m.has(e)) {
                             const t = m.get(e),
                               i = [...t.rtcpFeedbackIds];
@@ -5531,69 +5908,69 @@
                       }
                     }));
                 const $ = P.map((e) => m.get(e)).filter((e) => void 0 !== e),
-                  y = r.parseExtmaps(e),
-                  T = r.parseSsrcs(e),
-                  O = r.parseSsrcGroups(e),
-                  w = r.parseCandidates(e),
-                  F = r.firstValueStartingWith(e, "a=ice-ufrag:"),
-                  R = r.firstValueStartingWith(e, "a=ice-pwd:"),
-                  b = F ? r.addToStringPool(t, F) : 0,
-                  A = R ? r.addToStringPool(t, R) : 0,
-                  _ = e.find((e) => e.startsWith("a=ice-options:")),
-                  M = _ ? _.substring(14).split(" ") : void 0,
-                  N = e.find((e) => e.startsWith("a=fingerprint:")),
-                  k = N
-                    ? r.parseFingerprint([N])
+                  T = s.parseExtmaps(e),
+                  y = s.parseSsrcs(e),
+                  O = s.parseSsrcGroups(e),
+                  w = s.parseCandidates(e),
+                  F = s.firstValueStartingWith(e, "a=ice-ufrag:"),
+                  R = s.firstValueStartingWith(e, "a=ice-pwd:"),
+                  A = F ? s.addToStringPool(t, F) : 0,
+                  b = R ? s.addToStringPool(t, R) : 0,
+                  N = e.find((e) => e.startsWith("a=ice-options:")),
+                  k = N ? N.substring(14).split(" ") : void 0,
+                  _ = e.find((e) => e.startsWith("a=fingerprint:")),
+                  D = _
+                    ? s.parseFingerprint([_])
                     : {
-                        hashFunc: a.HashFunction.SHA256,
+                        hashFunc: l.HashFunction.SHA256,
                         hashValue: new Uint8Array(0),
                       },
-                  D = e.find((e) => e.startsWith("a=setup:"));
+                  M = e.find((e) => e.startsWith("a=setup:"));
                 return {
                   type: n,
                   mid: d,
-                  direction: p,
+                  direction: u,
                   msidStream: g,
                   msidTrackLabel: h,
                   msidTrackId: S,
                   rtcpMux: C,
-                  rtcpRsize: f,
-                  extmaps: y,
+                  rtcpRsize: v,
+                  extmaps: T,
                   codecs: $,
                   ssrcGroups: O,
-                  ssrcs: T,
+                  ssrcs: y,
                   connectionAddress: I,
                   candidates: w,
-                  endOfCandidates: v,
+                  endOfCandidates: f,
                   rtcpAddress: E,
-                  iceUfragRef: b,
-                  icePwdRef: A,
-                  iceOptions: M,
-                  fingerprint: k,
-                  setup: D ? r.parseSetup([D]) : a.DTLSSetup.ACTPASS,
+                  iceUfragRef: A,
+                  icePwdRef: b,
+                  iceOptions: k,
+                  fingerprint: D,
+                  setup: M ? s.parseSetup([M]) : l.DTLSSetup.ACTPASS,
                   port: o,
                 };
               } catch (e) {
                 return (
-                  l.error(
+                  r.error(
                     `[647] [CallId: GLOBAL_LOGS] Failed to parse media section: ${e.message}`,
                     { color: "red" },
                   ),
-                  l.error(e, { color: "red" }),
+                  r.error(e, { color: "red" }),
                   null
                 );
               }
             }
             static parseDirection(e) {
               return e.some((e) => "a=sendrecv" === e)
-                ? a.MediaDirection.SENDRECV
+                ? l.MediaDirection.SENDRECV
                 : e.some((e) => "a=sendonly" === e)
-                  ? a.MediaDirection.SENDONLY
+                  ? l.MediaDirection.SENDONLY
                   : e.some((e) => "a=recvonly" === e)
-                    ? a.MediaDirection.RECVONLY
+                    ? l.MediaDirection.RECVONLY
                     : e.some((e) => "a=inactive" === e)
-                      ? a.MediaDirection.INACTIVE
-                      : a.MediaDirection.SENDRECV;
+                      ? l.MediaDirection.INACTIVE
+                      : l.MediaDirection.SENDRECV;
             }
             static parseMSID(e) {
               if (!e || 0 === e.trim().length) return ["", "", 0];
@@ -5634,7 +6011,7 @@
                     n = parseInt(i, 10);
                   if (isNaN(n)) return null;
                   const a = t[1];
-                  return { id: n, mapKey: r.URI_TO_EXTMAP_ID.get(a) || 0 };
+                  return { id: n, mapKey: s.URI_TO_EXTMAP_ID.get(a) || 0 };
                 })
                 .filter((e) => null !== e);
             }
@@ -5690,7 +6067,7 @@
             static parseCandidates(e) {
               return e
                 .filter((e) => e.startsWith("a=candidate:"))
-                .map((e) => r.parseCandidate(e.substring(12)))
+                .map((e) => s.parseCandidate(e.substring(12)))
                 .filter((e) => null !== e);
             }
             static parseCandidate(e) {
@@ -5700,14 +6077,14 @@
               if (isNaN(i)) return null;
               const n = parseInt(t[1], 10);
               if (isNaN(n)) return null;
-              let l;
+              let a;
               switch (t[2].toLowerCase()) {
                 case "udp":
                 default:
-                  l = a.IceCandidateProtocol.UDP;
+                  a = l.IceCandidateProtocol.UDP;
                   break;
                 case "tcp":
-                  l = a.IceCandidateProtocol.TCP;
+                  a = l.IceCandidateProtocol.TCP;
               }
               const r = parseInt(t[3], 10);
               if (isNaN(r)) return null;
@@ -5719,46 +6096,46 @@
               switch (t[7].toLowerCase()) {
                 case "host":
                 default:
-                  d = a.IceCandidateType.HOST;
+                  d = l.IceCandidateType.HOST;
                   break;
                 case "srflx":
-                  d = a.IceCandidateType.SRFLX;
+                  d = l.IceCandidateType.SRFLX;
                   break;
                 case "prflx":
-                  d = a.IceCandidateType.PRFLX;
+                  d = l.IceCandidateType.PRFLX;
                   break;
                 case "relay":
-                  d = a.IceCandidateType.RELAY;
+                  d = l.IceCandidateType.RELAY;
               }
-              let p = new Uint8Array(0),
-                u = 0,
-                g = a.IceCandidateTcpType.ACTIVE,
+              let u = new Uint8Array(0),
+                p = 0,
+                g = l.IceCandidateTcpType.ACTIVE,
                 h = 8;
               for (; h < t.length; ) {
                 switch (t[h]) {
                   case "raddr":
                     if (h + 1 < t.length) {
                       const e = t[++h];
-                      p = new Uint8Array(
+                      u = new Uint8Array(
                         e.split(".").map((e) => parseInt(e, 10)),
                       );
                     }
                     break;
                   case "rport":
-                    h + 1 < t.length && (u = parseInt(t[++h], 10) || 0);
+                    h + 1 < t.length && (p = parseInt(t[++h], 10) || 0);
                     break;
                   case "tcptype":
                     if (h + 1 < t.length)
                       switch (t[++h].toLowerCase()) {
                         case "active":
                         default:
-                          g = a.IceCandidateTcpType.ACTIVE;
+                          g = l.IceCandidateTcpType.ACTIVE;
                           break;
                         case "passive":
-                          g = a.IceCandidateTcpType.PASSIVE;
+                          g = l.IceCandidateTcpType.PASSIVE;
                           break;
                         case "so":
-                          g = a.IceCandidateTcpType.SO;
+                          g = l.IceCandidateTcpType.SO;
                       }
                 }
                 h++;
@@ -5766,13 +6143,13 @@
               return {
                 foundation: i,
                 component: n,
-                protocol: l,
+                protocol: a,
                 priority: r,
                 ip: o,
                 port: c,
                 type: d,
-                raddr: p,
-                rport: u,
+                raddr: u,
+                rport: p,
                 tcptype: g,
               };
             }
@@ -5795,10 +6172,10 @@
               if (!e.codecName) return null;
               const t = e.codecName;
               if (t.mapKey > 0) {
-                const e = r.MAP_KEY_TO_CODEC_NAME.get(t.mapKey);
+                const e = s.MAP_KEY_TO_CODEC_NAME.get(t.mapKey);
                 if (e) return e;
               }
-              return r.dynamicCodecNames.get(t.id) || null;
+              return s.dynamicCodecNames.get(t.id) || null;
             }
             static filterVideoCodecs(e, t) {
               if (0 === t.length) return e;
@@ -5806,14 +6183,14 @@
                 n = new Set();
               return (
                 e.forEach((e) => {
-                  const a = r.getCodecName(e);
+                  const a = s.getCodecName(e);
                   if (!a) return;
                   const l = a.split("/")[0];
                   t.some((e) => e.toLowerCase() === l.toLowerCase()) &&
-                    (i.push(e), n.add(r.getCodecID(e)));
+                    (i.push(e), n.add(s.getCodecID(e)));
                 }),
                 e.forEach((e) => {
-                  const t = r.getCodecName(e);
+                  const t = s.getCodecName(e);
                   if (t && t.toLowerCase().startsWith("rtx/")) {
                     const t = e.fmtp.find((e) => "apt" === e.key),
                       a = t ? parseInt(t.value, 10) : null;
@@ -5824,37 +6201,37 @@
               );
             }
             static buildMediaSection(e, t, i) {
-              var n, s, o, c, d, p, u, g, h, S;
+              var n, a, o, c, d, u, p, g, h, S;
               let C;
               switch (t.type) {
-                case a.MediaType.AUDIO:
+                case l.MediaType.AUDIO:
                   C = "audio";
                   break;
-                case a.MediaType.VIDEO:
+                case l.MediaType.VIDEO:
                   C = "video";
                   break;
-                case a.MediaType.MEDIA_TYPE_UNSPECIFIED:
-                  return void l.error(
+                case l.MediaType.MEDIA_TYPE_UNSPECIFIED:
+                  return void r.error(
                     "Cannot reconstruct MEDIA_TYPE_UNSPECIFIED",
                   );
               }
-              const f =
+              const v =
                 (null === (n = null == t ? void 0 : t.codecs) || void 0 === n
                   ? void 0
-                  : n.map((e) => r.getCodecID(e).toString()).join(" ")) || "";
-              e.push(`m=${C} ${t.port} UDP/TLS/RTP/SAVPF ${f}\r\n`);
-              const v =
+                  : n.map((e) => s.getCodecID(e).toString()).join(" ")) || "";
+              e.push(`m=${C} ${t.port} UDP/TLS/RTP/SAVPF ${v}\r\n`);
+              const f =
                 (null == t ? void 0 : t.connectionAddress) ||
                 (null == i ? void 0 : i.connectionAddress) ||
                 "0.0.0.0";
-              (e.push(`c=IN IP4 ${v}\r\n`),
-                (null === (s = null == t ? void 0 : t.rtcpAddress) ||
-                void 0 === s
+              (e.push(`c=IN IP4 ${f}\r\n`),
+                (null === (a = null == t ? void 0 : t.rtcpAddress) ||
+                void 0 === a
                   ? void 0
-                  : s.length) > 0 && e.push(`a=rtcp:${t.rtcpAddress}\r\n`));
+                  : a.length) > 0 && e.push(`a=rtcp:${t.rtcpAddress}\r\n`));
               const I =
                   (null == t ? void 0 : t.iceUfragRef) > 0
-                    ? r.getFromStringPool(
+                    ? s.getFromStringPool(
                         null == i ? void 0 : i.stringPool,
                         null == t ? void 0 : t.iceUfragRef,
                       )
@@ -5863,7 +6240,7 @@
                       : i.iceUfrag,
                 E =
                   (null == t ? void 0 : t.icePwdRef) > 0
-                    ? r.getFromStringPool(
+                    ? s.getFromStringPool(
                         null == i ? void 0 : i.stringPool,
                         null == t ? void 0 : t.icePwdRef,
                       )
@@ -5894,46 +6271,46 @@
               (null === (d = null == P ? void 0 : P.hashValue) || void 0 === d
                 ? void 0
                 : d.length) > 0 &&
-                e.push(`a=fingerprint:${r.fingerprintToString(P)}\r\n`);
+                e.push(`a=fingerprint:${s.fingerprintToString(P)}\r\n`);
               const $ =
-                (null == t ? void 0 : t.setup) !== a.DTLSSetup.ACTPASS ||
-                (null == i ? void 0 : i.setup) === a.DTLSSetup.ACTPASS
+                (null == t ? void 0 : t.setup) !== l.DTLSSetup.ACTPASS ||
+                (null == i ? void 0 : i.setup) === l.DTLSSetup.ACTPASS
                   ? t.setup
                   : i.setup;
-              (e.push(`a=setup:${r.setupToString($)}\r\n`),
+              (e.push(`a=setup:${s.setupToString($)}\r\n`),
                 e.push(`a=mid:${null == t ? void 0 : t.mid}\r\n`),
-                null === (p = null == t ? void 0 : t.extmaps) ||
-                  void 0 === p ||
-                  p.forEach((t) => {
+                null === (u = null == t ? void 0 : t.extmaps) ||
+                  void 0 === u ||
+                  u.forEach((t) => {
                     const i =
-                      r.EXTMAP_ID_TO_URI.get(t.mapKey) ||
+                      s.EXTMAP_ID_TO_URI.get(t.mapKey) ||
                       `urn:ietf:params:rtp-hdrext:extension-${t.id}`;
                     e.push(`a=extmap:${t.id} ${i}\r\n`);
                   }),
                 e.push(
-                  `a=${r.directionToString(null == t ? void 0 : t.direction)}\r\n`,
+                  `a=${s.directionToString(null == t ? void 0 : t.direction)}\r\n`,
                 ));
-              const y = r.reconstructMSID(
+              const T = s.reconstructMSID(
                 null == t ? void 0 : t.msidStream,
                 null == t ? void 0 : t.msidTrackLabel,
                 null == t ? void 0 : t.msidTrackId,
               );
-              ((null == y ? void 0 : y.length) > 0 && e.push(`a=msid:${y}\r\n`),
+              ((null == T ? void 0 : T.length) > 0 && e.push(`a=msid:${T}\r\n`),
                 (null == t ? void 0 : t.rtcpMux) && e.push("a=rtcp-mux\r\n"),
                 (null == t ? void 0 : t.rtcpRsize) &&
                   e.push("a=rtcp-rsize\r\n"),
-                null === (u = null == t ? void 0 : t.codecs) ||
-                  void 0 === u ||
-                  u.forEach((t) => {
+                null === (p = null == t ? void 0 : t.codecs) ||
+                  void 0 === p ||
+                  p.forEach((t) => {
                     var i, n;
-                    const a = r.getCodecID(t),
-                      l = r.getCodecName(t);
+                    const a = s.getCodecID(t),
+                      l = s.getCodecName(t);
                     if (
                       (l && e.push(`a=rtpmap:${a} ${l}\r\n`),
                       null === (i = null == t ? void 0 : t.rtcpFeedbackIds) ||
                         void 0 === i ||
                         i.forEach((t) => {
-                          const i = r.RTCP_FEEDBACK_ID_TO_STRING.get(t);
+                          const i = s.RTCP_FEEDBACK_ID_TO_STRING.get(t);
                           i && e.push(`a=rtcp-fb:${a} ${i}\r\n`);
                         }),
                       (null === (n = null == t ? void 0 : t.fmtp) ||
@@ -5941,7 +6318,7 @@
                         ? void 0
                         : n.length) > 0)
                     ) {
-                      const i = r.reconstructFmtp(t.fmtp);
+                      const i = s.reconstructFmtp(t.fmtp);
                       e.push(`a=fmtp:${a} ${i}\r\n`);
                     }
                   }),
@@ -5972,7 +6349,7 @@
                 null === (S = null == t ? void 0 : t.candidates) ||
                   void 0 === S ||
                   S.forEach((t) => {
-                    e.push(`a=candidate:${r.reconstructCandidate(t)}\r\n`);
+                    e.push(`a=candidate:${s.reconstructCandidate(t)}\r\n`);
                   }),
                 (null == t ? void 0 : t.endOfCandidates) &&
                   e.push("a=end-of-candidates\r\n"));
@@ -5998,19 +6375,19 @@
             static fingerprintToString(e) {
               let t;
               switch (e.hashFunc) {
-                case a.HashFunction.SHA256:
+                case l.HashFunction.SHA256:
                   t = "sha-256";
                   break;
-                case a.HashFunction.SHA1:
+                case l.HashFunction.SHA1:
                   t = "sha-1";
                   break;
-                case a.HashFunction.SHA384:
+                case l.HashFunction.SHA384:
                   t = "sha-384";
                   break;
-                case a.HashFunction.SHA512:
+                case l.HashFunction.SHA512:
                   t = "sha-512";
                   break;
-                case a.HashFunction.MD5:
+                case l.HashFunction.MD5:
                   t = "md5";
               }
               return `${t} ${Array.from(e.hashValue)
@@ -6019,21 +6396,21 @@
             }
             static setupToString(e) {
               switch (e) {
-                case a.DTLSSetup.ACTIVE:
+                case l.DTLSSetup.ACTIVE:
                   return "active";
-                case a.DTLSSetup.PASSIVE:
+                case l.DTLSSetup.PASSIVE:
                   return "passive";
-                case a.DTLSSetup.ACTPASS:
+                case l.DTLSSetup.ACTPASS:
                   return "actpass";
               }
             }
             static directionToString(e) {
               switch (e) {
-                case a.MediaDirection.SENDONLY:
+                case l.MediaDirection.SENDONLY:
                   return "sendonly";
-                case a.MediaDirection.RECVONLY:
+                case l.MediaDirection.RECVONLY:
                   return "recvonly";
-                case a.MediaDirection.INACTIVE:
+                case l.MediaDirection.INACTIVE:
                   return "inactive";
                 default:
                   return "sendrecv";
@@ -6041,19 +6418,19 @@
             }
             static reconstructCandidate(e) {
               const t =
-                e.protocol === a.IceCandidateProtocol.UDP ? "udp" : "tcp";
+                e.protocol === l.IceCandidateProtocol.UDP ? "udp" : "tcp";
               let i;
               switch (e.type) {
-                case a.IceCandidateType.HOST:
+                case l.IceCandidateType.HOST:
                   i = "host";
                   break;
-                case a.IceCandidateType.SRFLX:
+                case l.IceCandidateType.SRFLX:
                   i = "srflx";
                   break;
-                case a.IceCandidateType.PRFLX:
+                case l.IceCandidateType.PRFLX:
                   i = "prflx";
                   break;
-                case a.IceCandidateType.RELAY:
+                case l.IceCandidateType.RELAY:
                   i = "relay";
               }
               const n = [
@@ -6081,13 +6458,13 @@
               ) {
                 let t;
                 switch (e.tcptype) {
-                  case a.IceCandidateTcpType.ACTIVE:
+                  case l.IceCandidateTcpType.ACTIVE:
                     t = "active";
                     break;
-                  case a.IceCandidateTcpType.PASSIVE:
+                  case l.IceCandidateTcpType.PASSIVE:
                     t = "passive";
                     break;
-                  case a.IceCandidateTcpType.SO:
+                  case l.IceCandidateTcpType.SO:
                     t = "so";
                 }
                 (n.push("tcptype"), n.push(t));
@@ -6095,8 +6472,8 @@
               return n.join(" ");
             }
           }
-          ((t.SdpConverter = r),
-            (r.EXTMAP_ID_TO_URI = new Map([
+          ((t.SdpConverter = s),
+            (s.EXTMAP_ID_TO_URI = new Map([
               [1, "urn:ietf:params:rtp-hdrext:toffset"],
               [2, "http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time"],
               [3, "urn:3gpp:video-orientation"],
@@ -6117,23 +6494,23 @@
               [14, "urn:ietf:params:rtp-hdrext:ssrc-audio-level"],
               [15, "urn:ietf:params:rtp-hdrext:csrc-audio-level"],
             ])),
-            (r.URI_TO_EXTMAP_ID = new Map(
-              Array.from(r.EXTMAP_ID_TO_URI.entries()).map(([e, t]) => [t, e]),
+            (s.URI_TO_EXTMAP_ID = new Map(
+              Array.from(s.EXTMAP_ID_TO_URI.entries()).map(([e, t]) => [t, e]),
             )),
-            (r.RTCP_FEEDBACK_ID_TO_STRING = new Map([
+            (s.RTCP_FEEDBACK_ID_TO_STRING = new Map([
               [1, "goog-remb"],
               [2, "transport-cc"],
               [3, "ccm fir"],
               [4, "nack"],
               [5, "nack pli"],
             ])),
-            (r.RTCP_FEEDBACK_STRING_TO_ID = new Map(
-              Array.from(r.RTCP_FEEDBACK_ID_TO_STRING.entries()).map(
+            (s.RTCP_FEEDBACK_STRING_TO_ID = new Map(
+              Array.from(s.RTCP_FEEDBACK_ID_TO_STRING.entries()).map(
                 ([e, t]) => [t, e],
               ),
             )),
-            (r.dynamicCodecNames = new Map()),
-            (r.CODEC_NAME_TO_MAP_KEY = new Map([
+            (s.dynamicCodecNames = new Map()),
+            (s.CODEC_NAME_TO_MAP_KEY = new Map([
               ["VP8/90000", 1],
               ["VP9/90000", 2],
               ["AV1/90000", 3],
@@ -6154,7 +6531,7 @@
               ["telephone-event/8000/1", 16],
               ["ILBC/8000", 17],
             ])),
-            (r.MAP_KEY_TO_CODEC_NAME = new Map([
+            (s.MAP_KEY_TO_CODEC_NAME = new Map([
               [1, "VP8/90000"],
               [2, "VP9/90000"],
               [3, "AV1/90000"],
@@ -6264,23 +6641,24 @@
           (Object.defineProperty(t, "__esModule", { value: !0 }),
             (t.SignalQueueStrategy = t.SignalProcessingStrategy = void 0));
           const n = i(578),
-            a = i(586);
-          var l;
+            a = i(586),
+            l = i(228);
+          var r;
           !(function (e) {
             ((e[(e.SEQUENTIAL = 0)] = "SEQUENTIAL"),
               (e[(e.IMMEDIATE = 1)] = "IMMEDIATE"));
-          })(l || (t.SignalProcessingStrategy = l = {}));
-          class r {
+          })(r || (t.SignalProcessingStrategy = r = {}));
+          class s {
             static getProcessingStrategy(e) {
               return this.SEQUENTIAL_SIGNALS.has(e)
-                ? l.SEQUENTIAL
-                : l.IMMEDIATE;
+                ? r.SEQUENTIAL
+                : r.IMMEDIATE;
             }
             static isSequentialSignal(e) {
-              return this.getProcessingStrategy(e) === l.SEQUENTIAL;
+              return this.getProcessingStrategy(e) === r.SEQUENTIAL;
             }
             static isImmediateSignal(e) {
-              return this.getProcessingStrategy(e) === l.IMMEDIATE;
+              return this.getProcessingStrategy(e) === r.IMMEDIATE;
             }
             static getSignalPriorityValue(e, t) {
               switch (e) {
@@ -6317,14 +6695,18 @@
                 case n.SignalEvent.SUCCESS:
                 case n.SignalEvent.CLOSE:
                 case n.SignalEvent.NO_ANSWER:
-                  throw new Error(`SignalEvent ${e} should not be in queue`);
+                  throw (0, l.checkCode)(
+                    4e3,
+                    `SignalEvent ${e} should not be in queue`,
+                  );
                 default:
                   return 0;
               }
             }
             static getSignalPriority(e) {
               if ("number" != typeof e.event)
-                throw new Error(
+                throw (0, l.checkCode)(
+                  4e3,
                   `Signal event is not a number for signal: ${JSON.stringify(e)}`,
                 );
               return this.getSignalPriorityValue(e.event, e);
@@ -6345,8 +6727,8 @@
               }
             }
           }
-          ((t.SignalQueueStrategy = r),
-            (r.SEQUENTIAL_SIGNALS = new Set([
+          ((t.SignalQueueStrategy = s),
+            (s.SEQUENTIAL_SIGNALS = new Set([
               n.SignalEvent.JOIN,
               n.SignalEvent.LEAVE,
               n.SignalEvent.DECLINE,
@@ -6630,8 +7012,8 @@
             o = i(228),
             c = i(65),
             d = i(429),
-            p = (0, l.createLogger)("Signaling");
-          class u {
+            u = (0, l.createLogger)("Signaling");
+          class p {
             constructor(e, t) {
               ((this.signalingQueues = new Map()), (this.chatClient = e));
               const i = new this.chatClient.ChannelListener();
@@ -6641,44 +7023,44 @@
                 this.chatClient.addChannelListener("call_listeners", i));
             }
             calculateRetryDelay(e) {
-              return Math.min(u.BASE_DELAY_MS * Math.pow(2, e), u.MAX_DELAY_MS);
+              return Math.min(p.BASE_DELAY_MS * Math.pow(2, e), p.MAX_DELAY_MS);
             }
             handleRetry(e, t, i, a) {
               var l;
               return n(this, void 0, void 0, function* () {
-                if (t >= u.MAX_RETRIES)
+                if (t >= p.MAX_RETRIES)
                   throw (
-                    p.error(
+                    u.error(
                       `[45] [CallId: ${e.signal.callId}] Max retries exceeded for signal: ${JSON.stringify(e.signal)}`,
                       { color: "red" },
                     ),
-                    i
+                    (0, o.toCallException)(i)
                   );
                 i instanceof c.SceytCallException &&
                   !i.isResendable &&
-                  (p.error(
+                  (u.error(
                     `[49] [CallId: ${e.signal.callId}] Signal sending failed with non-resendable exception: ${i.message}`,
                     { color: "red" },
                   ),
                   null === (l = e.callback) || void 0 === l || l.call(e, i),
                   a.removeSignalFromQueue(e));
                 const n = this.calculateRetryDelay(t);
-                (p.error(
-                  `[53] [CallId: ${e.signal.callId}] Sending signal failed with error: ${i.message}, but ChatClient is connected. Retrying in ${n}ms (attempt ${t + 1}/${u.MAX_RETRIES})`,
+                (u.error(
+                  `[53] [CallId: ${e.signal.callId}] Sending signal failed with error: ${i.message}, but ChatClient is connected. Retrying in ${n}ms (attempt ${t + 1}/${p.MAX_RETRIES})`,
                   { color: "red" },
                 ),
                   yield new Promise((e) => setTimeout(e, n)));
                 try {
                   const t = yield this.sendSignalSuspended(e);
                   return (
-                    p.info(
+                    u.info(
                       `[64] [CallId: ${e.signal.callId}] Retry sending signal success: ${JSON.stringify(t)}`,
                     ),
                     t
                   );
                 } catch (i) {
                   return (
-                    p.error(
+                    u.error(
                       `[67] [CallId: ${e.signal.callId}] Retry sending signal failed: ${i instanceof Error ? i.message : String(i)}`,
                     ),
                     this.handleRetry(
@@ -6694,7 +7076,7 @@
             sendSignalSuspended(e) {
               return n(this, void 0, void 0, function* () {
                 try {
-                  p.info(
+                  u.info(
                     `[78] [CallId: ${e.signal.callId}] Sending signal to chat client: version: 132 ${JSON.stringify(e.signal)}`,
                   );
                   const t = yield this.chatClient.sendSignal(e.signal, 132);
@@ -6707,7 +7089,7 @@
               });
             }
             sendSignalMessage(e, t, i) {
-              p.info(
+              u.info(
                 `[92] [CallId: ${e.callId}] Sending signal message request: ${a.SignalEvent[e.event]} uniqueKey: ${(0, d.v4)()} ${JSON.stringify(e)}`,
                 { color: "yellow" },
               );
@@ -6733,11 +7115,11 @@
                   ),
                   e.metadata && { metadata: e.metadata },
                 ),
-                o = i || e.callId;
-              let g = this.signalingQueues.get(o);
-              (g ||
-                ((g = new s.SignalingQueue(
-                  o,
+                g = i || e.callId;
+              let h = this.signalingQueues.get(g);
+              (h ||
+                ((h = new s.SignalingQueue(
+                  g,
                   () => "Connected" === this.chatClient.connectionState,
                   (e) =>
                     n(this, void 0, void 0, function* () {
@@ -6745,42 +7127,42 @@
                       try {
                         const l = yield this.sendSignalSuspended(e);
                         if (
-                          (p.info(
+                          (u.info(
                             `[115] [CallId: ${e.signal.callId || "GLOBAL_LOGS"}] Sent signal message response: ${a.SignalEvent[e.signal.event]} uniqueKey: ${e.uniqueKey} ${JSON.stringify(l)}`,
                             { color: "magenta" },
                           ),
                           (null == l ? void 0 : l.event) ===
                             a.SignalEvent.ERROR)
                         )
-                          throw new c.SceytCallException(
+                          throw (0, o.checkCode)(
                             (null === (t = null == l ? void 0 : l.error) ||
                             void 0 === t
                               ? void 0
-                              : t.message) || "Unknown error",
+                              : t.code) || 0,
                             (null === (i = null == l ? void 0 : l.error) ||
                             void 0 === i
                               ? void 0
-                              : i.code) || 0,
+                              : i.message) || "Unknown error",
                           );
                         return (
                           null === (n = e.callback) ||
                             void 0 === n ||
                             n.call(e, l),
-                          null == g || g.removeSignalFromQueue(e),
+                          null == h || h.removeSignalFromQueue(e),
                           l
                         );
                       } catch (t) {
                         if (
-                          (p.error(
+                          (u.error(
                             `[125] [CallId: ${e.signal.callId || "GLOBAL_LOGS"}] Signal message error: ${a.SignalEvent[e.signal.event]} uniqueKey: ${e.uniqueKey} error: ${t instanceof Error ? t.message : String(t)}, resendable: ${t instanceof c.SceytCallException && t.isResendable}`,
                             { color: "red" },
                           ),
                           t instanceof c.SceytCallException && t.isResendable)
                         ) {
                           const i = e.requeueCount;
-                          i < u.REQUEUE_LIMIT
-                            ? null == g ||
-                              g.addSignalToQueue(
+                          i < p.REQUEUE_LIMIT
+                            ? null == h ||
+                              h.addSignalToQueue(
                                 new r.QueuedSignal(
                                   e.signal,
                                   e.callback,
@@ -6790,14 +7172,14 @@
                                   (0, d.v4)(),
                                 ),
                               )
-                            : (p.error(
+                            : (u.error(
                                 `[140] [CallId: ${e.signal.callId || "GLOBAL_LOGS"}] Max requeue limit reached for signal: ${JSON.stringify(e.signal)}, will not requeue again. uniqueKey: ${e.uniqueKey}`,
                                 { color: "red" },
                               ),
                               null === (l = e.callback) ||
                                 void 0 === l ||
                                 l.call(e, t),
-                              null == g || g.removeSignalFromQueue(e));
+                              null == h || h.removeSignalFromQueue(e));
                         }
                         const i =
                           t instanceof c.SceytCallException
@@ -6808,12 +7190,12 @@
                         (null === (s = e.callback) ||
                           void 0 === s ||
                           s.call(e, i),
-                          null == g || g.removeSignalFromQueue(e));
+                          null == h || h.removeSignalFromQueue(e));
                       }
                     }),
                 )),
-                this.signalingQueues.set(o, g)),
-                g.addSignalToQueue(
+                this.signalingQueues.set(g, h)),
+                h.addSignalToQueue(
                   new r.QueuedSignal(l, t, 0, 0, 0, (0, d.v4)()),
                 ));
             }
@@ -6836,11 +7218,162 @@
               );
             }
           }
-          ((t.Signaling = u),
-            (u.REQUEUE_LIMIT = 10),
-            (u.MAX_RETRIES = 10),
-            (u.BASE_DELAY_MS = 1e3),
-            (u.MAX_DELAY_MS = 8e3));
+          ((t.Signaling = p),
+            (p.REQUEUE_LIMIT = 10),
+            (p.MAX_RETRIES = 10),
+            (p.BASE_DELAY_MS = 1e3),
+            (p.MAX_DELAY_MS = 8e3));
+        },
+        342: (e, t, i) => {
+          (Object.defineProperty(t, "__esModule", { value: !0 }),
+            (t.ReceiveSignalValidator = void 0));
+          const n = i(578),
+            a = (0, i(645).createLogger)("ReceiveSignalValidator");
+          class l {
+            static canHandleSignal(e, t) {
+              const i = l.validateSignal(e, t.state, t.localParticipant);
+              return (
+                i ||
+                  a.warn(
+                    `Cannot handle signal ${e.event} in call state ${t.state} with local participant state ${t.localParticipant.state}`,
+                  ),
+                i
+              );
+            }
+            static validateSignal(e, t, i) {
+              switch (e.event) {
+                case n.SignalEvent.JOIN:
+                case n.SignalEvent.LEAVE:
+                  return !0;
+                case n.SignalEvent.OFFER:
+                case n.SignalEvent.ANSWER:
+                  return t === n.CallState.Connected;
+                case n.SignalEvent.KICK:
+                  return !0;
+                case n.SignalEvent.INVITE:
+                  return (
+                    !e.participants ||
+                    !e.participants.some((e) => e.id === i.id) ||
+                    t === n.CallState.Idle
+                  );
+                case n.SignalEvent.DECLINE:
+                case n.SignalEvent.RINGING:
+                case n.SignalEvent.INFO:
+                case n.SignalEvent.UPDATE:
+                case n.SignalEvent.CLOSE:
+                  return !0;
+                case n.SignalEvent.ICE:
+                  return t === n.CallState.Connected;
+                case n.SignalEvent.SWITCH_MEDIA_FLOW:
+                case n.SignalEvent.NO_ANSWER:
+                case n.SignalEvent.MUTE:
+                case n.SignalEvent.UNMUTE:
+                case n.SignalEvent.HOLD:
+                case n.SignalEvent.UNHOLD:
+                case n.SignalEvent.VIDEO_ON:
+                case n.SignalEvent.VIDEO_OFF:
+                case n.SignalEvent.SCREEN_SHARE_ON:
+                case n.SignalEvent.SCREEN_SHARE_OFF:
+                case n.SignalEvent.MEDIA_CONNECTED:
+                case n.SignalEvent.CONNECT:
+                case n.SignalEvent.GET_CALL:
+                  return !0;
+                default:
+                  return (
+                    a.warn(`Unknown signal event for handling: ${e.event}`),
+                    !1
+                  );
+              }
+            }
+          }
+          t.ReceiveSignalValidator = l;
+        },
+        771: (e, t, i) => {
+          (Object.defineProperty(t, "__esModule", { value: !0 }),
+            (t.SendSignalValidator = void 0));
+          const n = i(578),
+            a = (0, i(645).createLogger)("SendSignalValidator");
+          class l {
+            canSendSignal(e, t) {
+              const i = l.validateSignalEvent(e.event, t.state);
+              return (
+                i ||
+                  a.warn(
+                    `Cannot send signal ${e.event} in call state ${t.state} with local participant state ${t.localParticipant.state}`,
+                  ),
+                i
+              );
+            }
+            canSendSignalEvent(e, t) {
+              const i = l.validateSignalEvent(e, t.state);
+              return (
+                i ||
+                  a.warn(
+                    `Cannot send signal ${e} in call state ${t.state} with local participant state ${t.localParticipant.state}`,
+                  ),
+                i
+              );
+            }
+            static validateSignalEvent(e, t) {
+              const i = t === n.CallState.Connected;
+              switch (e) {
+                case n.SignalEvent.JOIN:
+                  return !0;
+                case n.SignalEvent.LEAVE:
+                  return i;
+                case n.SignalEvent.OFFER:
+                case n.SignalEvent.ANSWER:
+                case n.SignalEvent.CONNECT:
+                case n.SignalEvent.KICK:
+                case n.SignalEvent.INVITE:
+                  return t === n.CallState.Connected;
+                case n.SignalEvent.DECLINE:
+                  return t === n.CallState.Idle;
+                case n.SignalEvent.RINGING:
+                  return t === n.CallState.Idle || t === n.CallState.Connecting;
+                case n.SignalEvent.INFO:
+                case n.SignalEvent.UPDATE:
+                  return t === n.CallState.Connected;
+                case n.SignalEvent.ICE:
+                case n.SignalEvent.GET_CALL:
+                  return !0;
+                case n.SignalEvent.SWITCH_MEDIA_FLOW:
+                case n.SignalEvent.MEDIA_CONNECTED:
+                  return t === n.CallState.Connected;
+                case n.SignalEvent.MUTE:
+                case n.SignalEvent.UNMUTE:
+                case n.SignalEvent.HOLD:
+                case n.SignalEvent.UNHOLD:
+                case n.SignalEvent.VIDEO_ON:
+                case n.SignalEvent.VIDEO_OFF:
+                  return i;
+                case n.SignalEvent.SCREEN_SHARE_ON:
+                case n.SignalEvent.SCREEN_SHARE_OFF:
+                  return t === n.CallState.Connected;
+                default:
+                  return (a.warn(`Unknown signal event for sending: ${e}`), !1);
+              }
+            }
+          }
+          t.SendSignalValidator = l;
+        },
+        302: (e, t, i) => {
+          (Object.defineProperty(t, "__esModule", { value: !0 }),
+            (t.ReceiveSignalValidator = t.SendSignalValidator = void 0));
+          var n = i(771);
+          Object.defineProperty(t, "SendSignalValidator", {
+            enumerable: !0,
+            get: function () {
+              return n.SendSignalValidator;
+            },
+          });
+          var a = i(342);
+          Object.defineProperty(t, "ReceiveSignalValidator", {
+            enumerable: !0,
+            get: function () {
+              return a.ReceiveSignalValidator;
+            },
+          });
         },
         740: (e, t) => {
           (Object.defineProperty(t, "__esModule", { value: !0 }),
@@ -7114,45 +7647,49 @@
               });
             }
             enableVideoOnPeerConnection(e, t, i = !1) {
-              (o.info(
-                `[27] [CallId: ${this.callId}] enableVideoOnPeerConnection in webrtcClient: enable: ${e}, kind: ${null == t ? void 0 : t.kind}`,
-                { color: "blue" },
-              ),
-                this.peerConnection.getTransceivers().forEach((a) =>
-                  n(this, void 0, void 0, function* () {
-                    a.sender.track &&
-                      "video" === a.sender.track.kind &&
-                      (t
-                        ? ((t.enabled = e), yield a.sender.replaceTrack(t))
-                        : (a.sender.track.enabled = e));
-                    const n = a.sender.getParameters();
-                    n.encodings &&
-                      n.encodings.length > 0 &&
-                      (n.encodings.forEach((e) => {
-                        e.maxBitrate = i ? 75e4 : 5e5;
-                      }),
-                      a.sender.setParameters(n),
-                      o.info(
-                        `[184] [CallId: ${this.callId}] enableVideoOnPeerConnection: Set video max bitrate to ${i ? 75e4 : 5e5} kbps`,
-                        { color: "blue" },
-                      ));
-                  }),
-                ));
+              return n(this, void 0, void 0, function* () {
+                o.info(
+                  `[27] [CallId: ${this.callId}] enableVideoOnPeerConnection in webrtcClient: enable: ${e}, kind: ${null == t ? void 0 : t.kind}`,
+                  { color: "blue" },
+                );
+                const n = this.peerConnection.getTransceivers();
+                for (let a = 0; a < n.length; a++) {
+                  const l = n[a];
+                  l.sender.track &&
+                    "video" === l.sender.track.kind &&
+                    (t
+                      ? ((t.enabled = e), yield l.sender.replaceTrack(t))
+                      : (l.sender.track.enabled = e));
+                  const r = l.sender.getParameters();
+                  r.encodings &&
+                    r.encodings.length > 0 &&
+                    (r.encodings.forEach((e) => {
+                      e.maxBitrate = i ? 75e4 : 5e5;
+                    }),
+                    yield l.sender.setParameters(r),
+                    o.info(
+                      `[184] [CallId: ${this.callId}] enableVideoOnPeerConnection: Set video max bitrate to ${i ? 75e4 : 5e5} kbps`,
+                      { color: "blue" },
+                    ));
+                }
+              });
             }
             enableAudioOnPeerConnection(e, t) {
-              (o.info(
-                `[33] [CallId: ${this.callId}] enableAudioOnPeerConnection in webrtcClient: mute: ${e}, kind: ${null == t ? void 0 : t.kind}`,
-                { color: "blue" },
-              ),
-                this.peerConnection.getTransceivers().forEach((i) =>
-                  n(this, void 0, void 0, function* () {
-                    i.sender.track &&
-                      "audio" === i.sender.track.kind &&
-                      (t
-                        ? ((t.enabled = !e), yield i.sender.replaceTrack(t))
-                        : (i.sender.track.enabled = !e));
-                  }),
-                ));
+              return n(this, void 0, void 0, function* () {
+                o.info(
+                  `[33] [CallId: ${this.callId}] enableAudioOnPeerConnection in webrtcClient: mute: ${e}, kind: ${null == t ? void 0 : t.kind}`,
+                  { color: "blue" },
+                );
+                const i = this.peerConnection.getTransceivers();
+                for (let n = 0; n < i.length; n++) {
+                  const a = i[n];
+                  a.sender.track &&
+                    "audio" === a.sender.track.kind &&
+                    (t
+                      ? ((t.enabled = !e), yield a.sender.replaceTrack(t))
+                      : (a.sender.track.enabled = !e));
+                }
+              });
             }
             createOffer(e, t, i) {
               return n(this, void 0, void 0, function* () {
@@ -7371,7 +7908,7 @@
             }));
         },
         578: (e, t) => {
-          var i, n, a, l, r, s, o, c, d, p;
+          var i, n, a, l, r, s, o, c, d, u;
           (Object.defineProperty(t, "__esModule", { value: !0 }),
             (t.CDRRequestDirection =
               t.CDRRequestEvent =
@@ -7461,7 +7998,7 @@
             })(d || (t.CDRRequestEvent = d = {})),
             (function (e) {
               ((e[(e.NEXT = 0)] = "NEXT"), (e[(e.PREVIOUS = 1)] = "PREVIOUS"));
-            })(p || (t.CDRRequestDirection = p = {})));
+            })(u || (t.CDRRequestDirection = u = {})));
         },
         489: (e, t) => {
           (Object.defineProperty(t, "__esModule", { value: !0 }),
@@ -7736,7 +8273,7 @@
             Object.defineProperty(t, "parse", {
               enumerable: !0,
               get: function () {
-                return p.default;
+                return u.default;
               },
             }),
             Object.defineProperty(t, "stringify", {
@@ -7781,16 +8318,16 @@
                 return o.default;
               },
             }));
-          var n = u(i(990)),
-            a = u(i(237)),
-            l = u(i(355)),
-            r = u(i(764)),
-            s = u(i(314)),
-            o = u(i(464)),
-            c = u(i(435)),
-            d = u(i(8)),
-            p = u(i(222));
-          function u(e) {
+          var n = p(i(990)),
+            a = p(i(237)),
+            l = p(i(355)),
+            r = p(i(764)),
+            s = p(i(314)),
+            o = p(i(464)),
+            c = p(i(435)),
+            d = p(i(8)),
+            u = p(i(222));
+          function p(e) {
             return e && e.__esModule ? e : { default: e };
           }
         },
@@ -7845,82 +8382,82 @@
                 let a = 1732584193,
                   c = -271733879,
                   d = -1732584194,
-                  p = 271733878;
+                  u = 271733878;
                 for (let t = 0; t < e.length; t += 16) {
                   const i = a,
-                    u = c,
+                    p = c,
                     g = d,
-                    h = p;
-                  ((a = l(a, c, d, p, e[t], 7, -680876936)),
-                    (p = l(p, a, c, d, e[t + 1], 12, -389564586)),
-                    (d = l(d, p, a, c, e[t + 2], 17, 606105819)),
-                    (c = l(c, d, p, a, e[t + 3], 22, -1044525330)),
-                    (a = l(a, c, d, p, e[t + 4], 7, -176418897)),
-                    (p = l(p, a, c, d, e[t + 5], 12, 1200080426)),
-                    (d = l(d, p, a, c, e[t + 6], 17, -1473231341)),
-                    (c = l(c, d, p, a, e[t + 7], 22, -45705983)),
-                    (a = l(a, c, d, p, e[t + 8], 7, 1770035416)),
-                    (p = l(p, a, c, d, e[t + 9], 12, -1958414417)),
-                    (d = l(d, p, a, c, e[t + 10], 17, -42063)),
-                    (c = l(c, d, p, a, e[t + 11], 22, -1990404162)),
-                    (a = l(a, c, d, p, e[t + 12], 7, 1804603682)),
-                    (p = l(p, a, c, d, e[t + 13], 12, -40341101)),
-                    (d = l(d, p, a, c, e[t + 14], 17, -1502002290)),
-                    (c = l(c, d, p, a, e[t + 15], 22, 1236535329)),
-                    (a = r(a, c, d, p, e[t + 1], 5, -165796510)),
-                    (p = r(p, a, c, d, e[t + 6], 9, -1069501632)),
-                    (d = r(d, p, a, c, e[t + 11], 14, 643717713)),
-                    (c = r(c, d, p, a, e[t], 20, -373897302)),
-                    (a = r(a, c, d, p, e[t + 5], 5, -701558691)),
-                    (p = r(p, a, c, d, e[t + 10], 9, 38016083)),
-                    (d = r(d, p, a, c, e[t + 15], 14, -660478335)),
-                    (c = r(c, d, p, a, e[t + 4], 20, -405537848)),
-                    (a = r(a, c, d, p, e[t + 9], 5, 568446438)),
-                    (p = r(p, a, c, d, e[t + 14], 9, -1019803690)),
-                    (d = r(d, p, a, c, e[t + 3], 14, -187363961)),
-                    (c = r(c, d, p, a, e[t + 8], 20, 1163531501)),
-                    (a = r(a, c, d, p, e[t + 13], 5, -1444681467)),
-                    (p = r(p, a, c, d, e[t + 2], 9, -51403784)),
-                    (d = r(d, p, a, c, e[t + 7], 14, 1735328473)),
-                    (c = r(c, d, p, a, e[t + 12], 20, -1926607734)),
-                    (a = s(a, c, d, p, e[t + 5], 4, -378558)),
-                    (p = s(p, a, c, d, e[t + 8], 11, -2022574463)),
-                    (d = s(d, p, a, c, e[t + 11], 16, 1839030562)),
-                    (c = s(c, d, p, a, e[t + 14], 23, -35309556)),
-                    (a = s(a, c, d, p, e[t + 1], 4, -1530992060)),
-                    (p = s(p, a, c, d, e[t + 4], 11, 1272893353)),
-                    (d = s(d, p, a, c, e[t + 7], 16, -155497632)),
-                    (c = s(c, d, p, a, e[t + 10], 23, -1094730640)),
-                    (a = s(a, c, d, p, e[t + 13], 4, 681279174)),
-                    (p = s(p, a, c, d, e[t], 11, -358537222)),
-                    (d = s(d, p, a, c, e[t + 3], 16, -722521979)),
-                    (c = s(c, d, p, a, e[t + 6], 23, 76029189)),
-                    (a = s(a, c, d, p, e[t + 9], 4, -640364487)),
-                    (p = s(p, a, c, d, e[t + 12], 11, -421815835)),
-                    (d = s(d, p, a, c, e[t + 15], 16, 530742520)),
-                    (c = s(c, d, p, a, e[t + 2], 23, -995338651)),
-                    (a = o(a, c, d, p, e[t], 6, -198630844)),
-                    (p = o(p, a, c, d, e[t + 7], 10, 1126891415)),
-                    (d = o(d, p, a, c, e[t + 14], 15, -1416354905)),
-                    (c = o(c, d, p, a, e[t + 5], 21, -57434055)),
-                    (a = o(a, c, d, p, e[t + 12], 6, 1700485571)),
-                    (p = o(p, a, c, d, e[t + 3], 10, -1894986606)),
-                    (d = o(d, p, a, c, e[t + 10], 15, -1051523)),
-                    (c = o(c, d, p, a, e[t + 1], 21, -2054922799)),
-                    (a = o(a, c, d, p, e[t + 8], 6, 1873313359)),
-                    (p = o(p, a, c, d, e[t + 15], 10, -30611744)),
-                    (d = o(d, p, a, c, e[t + 6], 15, -1560198380)),
-                    (c = o(c, d, p, a, e[t + 13], 21, 1309151649)),
-                    (a = o(a, c, d, p, e[t + 4], 6, -145523070)),
-                    (p = o(p, a, c, d, e[t + 11], 10, -1120210379)),
-                    (d = o(d, p, a, c, e[t + 2], 15, 718787259)),
-                    (c = o(c, d, p, a, e[t + 9], 21, -343485551)),
+                    h = u;
+                  ((a = l(a, c, d, u, e[t], 7, -680876936)),
+                    (u = l(u, a, c, d, e[t + 1], 12, -389564586)),
+                    (d = l(d, u, a, c, e[t + 2], 17, 606105819)),
+                    (c = l(c, d, u, a, e[t + 3], 22, -1044525330)),
+                    (a = l(a, c, d, u, e[t + 4], 7, -176418897)),
+                    (u = l(u, a, c, d, e[t + 5], 12, 1200080426)),
+                    (d = l(d, u, a, c, e[t + 6], 17, -1473231341)),
+                    (c = l(c, d, u, a, e[t + 7], 22, -45705983)),
+                    (a = l(a, c, d, u, e[t + 8], 7, 1770035416)),
+                    (u = l(u, a, c, d, e[t + 9], 12, -1958414417)),
+                    (d = l(d, u, a, c, e[t + 10], 17, -42063)),
+                    (c = l(c, d, u, a, e[t + 11], 22, -1990404162)),
+                    (a = l(a, c, d, u, e[t + 12], 7, 1804603682)),
+                    (u = l(u, a, c, d, e[t + 13], 12, -40341101)),
+                    (d = l(d, u, a, c, e[t + 14], 17, -1502002290)),
+                    (c = l(c, d, u, a, e[t + 15], 22, 1236535329)),
+                    (a = r(a, c, d, u, e[t + 1], 5, -165796510)),
+                    (u = r(u, a, c, d, e[t + 6], 9, -1069501632)),
+                    (d = r(d, u, a, c, e[t + 11], 14, 643717713)),
+                    (c = r(c, d, u, a, e[t], 20, -373897302)),
+                    (a = r(a, c, d, u, e[t + 5], 5, -701558691)),
+                    (u = r(u, a, c, d, e[t + 10], 9, 38016083)),
+                    (d = r(d, u, a, c, e[t + 15], 14, -660478335)),
+                    (c = r(c, d, u, a, e[t + 4], 20, -405537848)),
+                    (a = r(a, c, d, u, e[t + 9], 5, 568446438)),
+                    (u = r(u, a, c, d, e[t + 14], 9, -1019803690)),
+                    (d = r(d, u, a, c, e[t + 3], 14, -187363961)),
+                    (c = r(c, d, u, a, e[t + 8], 20, 1163531501)),
+                    (a = r(a, c, d, u, e[t + 13], 5, -1444681467)),
+                    (u = r(u, a, c, d, e[t + 2], 9, -51403784)),
+                    (d = r(d, u, a, c, e[t + 7], 14, 1735328473)),
+                    (c = r(c, d, u, a, e[t + 12], 20, -1926607734)),
+                    (a = s(a, c, d, u, e[t + 5], 4, -378558)),
+                    (u = s(u, a, c, d, e[t + 8], 11, -2022574463)),
+                    (d = s(d, u, a, c, e[t + 11], 16, 1839030562)),
+                    (c = s(c, d, u, a, e[t + 14], 23, -35309556)),
+                    (a = s(a, c, d, u, e[t + 1], 4, -1530992060)),
+                    (u = s(u, a, c, d, e[t + 4], 11, 1272893353)),
+                    (d = s(d, u, a, c, e[t + 7], 16, -155497632)),
+                    (c = s(c, d, u, a, e[t + 10], 23, -1094730640)),
+                    (a = s(a, c, d, u, e[t + 13], 4, 681279174)),
+                    (u = s(u, a, c, d, e[t], 11, -358537222)),
+                    (d = s(d, u, a, c, e[t + 3], 16, -722521979)),
+                    (c = s(c, d, u, a, e[t + 6], 23, 76029189)),
+                    (a = s(a, c, d, u, e[t + 9], 4, -640364487)),
+                    (u = s(u, a, c, d, e[t + 12], 11, -421815835)),
+                    (d = s(d, u, a, c, e[t + 15], 16, 530742520)),
+                    (c = s(c, d, u, a, e[t + 2], 23, -995338651)),
+                    (a = o(a, c, d, u, e[t], 6, -198630844)),
+                    (u = o(u, a, c, d, e[t + 7], 10, 1126891415)),
+                    (d = o(d, u, a, c, e[t + 14], 15, -1416354905)),
+                    (c = o(c, d, u, a, e[t + 5], 21, -57434055)),
+                    (a = o(a, c, d, u, e[t + 12], 6, 1700485571)),
+                    (u = o(u, a, c, d, e[t + 3], 10, -1894986606)),
+                    (d = o(d, u, a, c, e[t + 10], 15, -1051523)),
+                    (c = o(c, d, u, a, e[t + 1], 21, -2054922799)),
+                    (a = o(a, c, d, u, e[t + 8], 6, 1873313359)),
+                    (u = o(u, a, c, d, e[t + 15], 10, -30611744)),
+                    (d = o(d, u, a, c, e[t + 6], 15, -1560198380)),
+                    (c = o(c, d, u, a, e[t + 13], 21, 1309151649)),
+                    (a = o(a, c, d, u, e[t + 4], 6, -145523070)),
+                    (u = o(u, a, c, d, e[t + 11], 10, -1120210379)),
+                    (d = o(d, u, a, c, e[t + 2], 15, 718787259)),
+                    (c = o(c, d, u, a, e[t + 9], 21, -343485551)),
                     (a = n(a, i)),
-                    (c = n(c, u)),
+                    (c = n(c, p)),
                     (d = n(d, g)),
-                    (p = n(p, h)));
+                    (u = n(u, h)));
                 }
-                return [a, c, d, p];
+                return [a, c, d, u];
               })(
                 (function (e) {
                   if (0 === e.length) return [];
@@ -8058,17 +8595,17 @@
                 o = a[1],
                 c = a[2],
                 d = a[3],
-                p = a[4];
+                u = a[4];
               for (let e = 0; e < 80; ++e) {
                 const a = Math.floor(e / 20),
-                  s = (n(r, 5) + i(a, o, c, d) + p + t[a] + l[e]) >>> 0;
-                ((p = d), (d = c), (c = n(o, 30) >>> 0), (o = r), (r = s));
+                  s = (n(r, 5) + i(a, o, c, d) + u + t[a] + l[e]) >>> 0;
+                ((u = d), (d = c), (c = n(o, 30) >>> 0), (o = r), (r = s));
               }
               ((a[0] = (a[0] + r) >>> 0),
                 (a[1] = (a[1] + o) >>> 0),
                 (a[2] = (a[2] + c) >>> 0),
                 (a[3] = (a[3] + d) >>> 0),
-                (a[4] = (a[4] + p) >>> 0));
+                (a[4] = (a[4] + u) >>> 0));
             }
             return [
               (a[0] >> 24) & 255,
@@ -8146,38 +8683,38 @@
           t.default = function (e, t, i) {
             let n = (t && i) || 0;
             const d = t || new Array(16);
-            let p = (e = e || {}).node || r,
-              u = void 0 !== e.clockseq ? e.clockseq : s;
-            if (null == p || null == u) {
+            let u = (e = e || {}).node || r,
+              p = void 0 !== e.clockseq ? e.clockseq : s;
+            if (null == u || null == p) {
               const t = e.random || (e.rng || a.default)();
-              (null == p && (p = r = [1 | t[0], t[1], t[2], t[3], t[4], t[5]]),
-                null == u && (u = s = 16383 & ((t[6] << 8) | t[7])));
+              (null == u && (u = r = [1 | t[0], t[1], t[2], t[3], t[4], t[5]]),
+                null == p && (p = s = 16383 & ((t[6] << 8) | t[7])));
             }
             let g = void 0 !== e.msecs ? e.msecs : Date.now(),
               h = void 0 !== e.nsecs ? e.nsecs : c + 1;
             const S = g - o + (h - c) / 1e4;
             if (
-              (S < 0 && void 0 === e.clockseq && (u = (u + 1) & 16383),
+              (S < 0 && void 0 === e.clockseq && (p = (p + 1) & 16383),
               (S < 0 || g > o) && void 0 === e.nsecs && (h = 0),
               h >= 1e4)
             )
               throw new Error(
                 "uuid.v1(): Can't create more than 10M uuids/sec",
               );
-            ((o = g), (c = h), (s = u), (g += 122192928e5));
+            ((o = g), (c = h), (s = p), (g += 122192928e5));
             const C = (1e4 * (268435455 & g) + h) % 4294967296;
             ((d[n++] = (C >>> 24) & 255),
               (d[n++] = (C >>> 16) & 255),
               (d[n++] = (C >>> 8) & 255),
               (d[n++] = 255 & C));
-            const f = ((g / 4294967296) * 1e4) & 268435455;
-            ((d[n++] = (f >>> 8) & 255),
-              (d[n++] = 255 & f),
-              (d[n++] = ((f >>> 24) & 15) | 16),
-              (d[n++] = (f >>> 16) & 255),
-              (d[n++] = (u >>> 8) | 128),
-              (d[n++] = 255 & u));
-            for (let e = 0; e < 6; ++e) d[n + e] = p[e];
+            const v = ((g / 4294967296) * 1e4) & 268435455;
+            ((d[n++] = (v >>> 8) & 255),
+              (d[n++] = 255 & v),
+              (d[n++] = ((v >>> 24) & 15) | 16),
+              (d[n++] = (v >>> 16) & 255),
+              (d[n++] = (p >>> 8) | 128),
+              (d[n++] = 255 & p));
+            for (let e = 0; e < 6; ++e) d[n + e] = u[e];
             return t || (0, l.unsafeStringify)(d);
           };
         },
