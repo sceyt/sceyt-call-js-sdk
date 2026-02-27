@@ -59,12 +59,13 @@ callClient.on('invitedToCall', ({ call }) => {
   // Show incoming call UI...
 });
 
-// Start a call
-const call = callClient.join({
-  id: 'call-123',
+// Start a call — prepare first, then join
+const result = callClient.prepareCall('call-123', {
+  mediaFlow: MediaFlow.P2P,
   participantIds: ['user1', 'user2'],
-  mediaFlow: MediaFlow.P2P
 });
+const call = result.data;
+call?.join({ audioSettings: { publishAudio: true } });
 
 // Handle call events
 call.on('callStateChanged', ({ state }) => {
@@ -130,29 +131,47 @@ Some methods support optional error callbacks for real-time error feedback:
 ```typescript
 const handleError = (result) => {
   if (result.error) {
-    console.error(result.error.message);
+    console.error(result.error.message, result.error.code);
   }
 };
 
-// Methods with error callback support:
-const joinResult = callClient.join(options, handleError);        // error callback
-callClient.reject(call, reason, handleError);                    // error callback
-const videoResult = await call.enableVideo(true, handleError);   // error callback
-await call.startScreenShare(handleError);                        // error callback
-await call.stopScreenShare(handleError);                         // error callback
-call.mute(true, handleError);                                    // error callback
-await call.switchToSFU(handleError);                             // error callback
+// Synchronous methods — check return value
+const prepareResult = callClient.prepareCall('call-123', { mediaFlow: MediaFlow.P2P });
+if (!prepareResult.success) console.error(prepareResult.error?.message);
+
+// Join — sync result + optional async signal error callback
+const joinResult = call.join({ audioSettings: { publishAudio: true } }, handleError);
+if (!joinResult.success) console.error(joinResult.error?.message);
+
+// Create without joining — optional async signal error callback
+call.create(handleError);
+
+// Ringing notification — optional async signal error callback
+call.sendRinging(handleError);
+
+// Reject — optional async signal error callback
+call.reject('busy', handleError);
+
+// Async methods — await result + optional async signal error callback
+const videoResult = await call.enableVideo(true, handleError);
+await call.startScreenShare(handleError);
+await call.stopScreenShare(handleError);
+call.mute(true, handleError);
+await call.switchToSFU(handleError);
 ```
 
 **Methods Supporting Error Callbacks:**
-- `callClient.join(options, errorCallback?)` - Called on join errors
-- `callClient.reject(call, reason?, errorCallback?)` - Called on reject errors
-- `callClient.leave(call)` - No callback (check result instead)
-- `call.enableVideo(enabled, errorCallback?)` - Called on video/camera errors
-- `call.startScreenShare(errorCallback?)` - Called on screen share errors
-- `call.stopScreenShare(errorCallback?)` - Called on stop errors
-- `call.mute(mute, errorCallback?)` - Called on mute errors
-- `call.switchToSFU(errorCallback?)` - Called on SFU switch errors
+- `callClient.prepareCall(callId, options?)` — check return value
+- `call.join(options, errorCallback?)` — signal rejection delivered via callback
+- `call.create(errorCallback?)` — server CREATE rejection delivered via callback
+- `call.sendRinging(errorCallback?)` — signal error delivered via callback
+- `call.reject(reason?, errorCallback?)` — signal error delivered via callback
+- `call.enableVideo(enabled, errorCallback?)` — camera/signal errors via callback
+- `call.startScreenShare(errorCallback?)` — screen share errors via callback
+- `call.stopScreenShare(errorCallback?)` — signal errors via callback
+- `call.mute(mute, errorCallback?)` — signal errors via callback
+- `call.switchToSFU(errorCallback?)` — signal errors via callback
+- `call.leave()` — no callback, check return value
 
 **All Error Codes:**
 
@@ -193,6 +212,10 @@ call.on('participantEvent', ({ participant, event }) => {
 call.on('activeSpeakersChanged', ({ activeSpeakers }) => {
   // Handle active speaker detection
 });
+
+call.on('sessionRenewed', ({ call, sessionId }) => {
+  // Fired when the server assigns a new sessionId to an existing call
+});
 ```
 
 ## Client Events
@@ -210,22 +233,39 @@ callClient.on('ongoingCallsUpdated', ({ calls }) => {
 ## Call Management
 
 ```typescript
-// Accept incoming call
-const call = callClient.join({
-  id: incomingCall.id,
-  sessionId: incomingCall.sessionId,
-  participantIds: [],
-  mediaFlow: incomingCall.mediaFlow
+// Prepare a call (placed in prepareCalls, no media yet)
+const result = callClient.prepareCall('call-123', {
+  mediaFlow: MediaFlow.SFU,
+  participantIds: ['user1'],
+});
+const call = result.data;
+
+// Join — moves call from prepareCalls to activeCalls
+call?.join({ audioSettings: { publishAudio: true } });
+
+// Create without joining (sends invites, stays in prepareCalls until server confirms)
+call?.create((error) => console.error(error.error?.message));
+
+// Accept an incoming call
+callClient.on('invitedToCall', ({ call }) => {
+  call.join({ audioSettings: { publishAudio: true } });
 });
 
-// Reject call
-callClient.reject(call, 'busy');
+// Reject / leave
+call?.reject('busy');
+call?.leave();
 
-// Leave call
-callClient.leave(call);
+// Calls prepared but not yet joined
+const pendingCalls = callClient.prepareCalls;
 
-// Get active calls
+// Calls actively joined
 const activeCalls = callClient.activeCalls;
+
+// Active speakers on a call (updated via 'activeSpeakersChanged' event)
+const speakers = call?.activeSpeakers;
+
+// Fetch a call by ID (local first, then server)
+const { data } = await callClient.getCall('call-id');
 ```
 
 ## Call History (CDR)

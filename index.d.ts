@@ -54,22 +54,6 @@ export declare enum ParticipantConnectionState {
 	Disconnected = 4
 }
 /**
- * Represents the media connection state for a call.
- * Similar to ParticipantConnectionState but at the call level.
- */
-export declare enum MediaConnectionState {
-	/** No media connection */
-	Idle = 0,
-	/** Media connection is being established */
-	Connecting = 1,
-	/** Media is flowing */
-	Connected = 2,
-	/** Media connection is being re-established */
-	Reconnecting = 3,
-	/** Media connection has been terminated */
-	Disconnected = 4
-}
-/**
  * Represents the overall state of a call.
  *
  * @example
@@ -126,13 +110,6 @@ export declare enum MediaFlow {
 	SFU = 1,
 	/** Server-to-WebRTC: Server-side media processing */
 	S2W = 2
-}
-/**
- * Indicates how a participant was added to the call.
- */
-export declare enum ParticipantEntryType {
-	/** Participant was explicitly added to the call */
-	ADDED = "ADDED"
 }
 /**
  * Sort order for call detail records (CDR) queries.
@@ -194,36 +171,93 @@ declare class SceytCallException extends Error {
  */
 export type ParticipantEvent = "Mute" | "Unmute" | "Hold" | "Unhold" | "VideoEnabled" | "VideoDisabled" | "ScreenSharingStarted" | "ScreenSharingStopped";
 /**
- * Options for joining or creating a call.
+ * Audio publish settings applied when joining a call.
+ */
+export interface AudioSettings {
+	/** Whether to publish audio when joining. Defaults to `true`. Set to `false` to join muted. */
+	publishAudio?: boolean;
+	/**
+	 * Device ID of the preferred audio input device to use when joining.
+	 * Obtain device IDs via `navigator.mediaDevices.enumerateDevices()`.
+	 */
+	preferredAudioRoute?: string | null;
+}
+/**
+ * Video publish settings applied when joining a call.
+ */
+export interface VideoSettings {
+	/** Whether to publish video when joining. Defaults to `true`. Set to `false` to join with camera off. */
+	publishVideo?: boolean;
+}
+/**
+ * Broadcast configuration for a call.
+ */
+export interface BroadcastSettings {
+	/** Whether broadcast mode is enabled */
+	enabled: boolean;
+}
+/**
+ * Scheduling and broadcast settings for a call.
+ */
+export interface CallSettings {
+	/** Scheduled start time (epoch ms) */
+	startsAt?: number;
+	/** Expiration timestamp (epoch ms). Must be greater than startsAt if both provided. */
+	expiresAt?: number;
+	/** Broadcast configuration */
+	broadcastSettings?: BroadcastSettings;
+	/** Whether the call is persistent (survives all participants leaving) */
+	persistent?: boolean;
+}
+/**
+ * Options for creating a call.
+ * Pass to `call.create(options)` after preparing a call via `callClient.prepareCall(callId, mediaFlow)`.
  *
  * @example
  * ```typescript
- * const options: IJoinCallOptions = {
- *   id: 'my-call-id',
+ * const result = callClient.prepareCall('my-call-id', MediaFlow.SFU);
+ * result.data?.create({
  *   participantIds: ['user1', 'user2'],
- *   mediaFlow: MediaFlow.P2P,
- *   metadata: { topic: 'Quick sync' }
- * };
- * const call = client.join(options);
+ *   metadata: { topic: 'Team standup' }
+ * });
  * ```
  */
-export interface IJoinCallOptions {
-	/** Unique identifier for the call. If not provided, one will be generated. */
-	id: string;
-	/** Server-assigned session ID. Usually not needed when creating a new call. */
-	sessionId?: string;
-	/** Array of user IDs to invite to the call */
-	participantIds: string[];
-	/** Media routing mode (P2P for direct connection, SFU for server-routed) */
+export interface CreateCallOptions {
+	/** Media routing mode (required) */
 	mediaFlow: MediaFlow;
-	/** Optional array of video tracks to use. If not provided, camera will be requested. */
-	localVideoTracks?: MediaStreamTrack[];
+	/** Optional metadata to attach to the call */
+	metadata?: CallMetadata;
+	/** Array of user IDs to invite to the call */
+	participantIds?: string[];
+	/** Whether this is a video call */
+	videoCall?: boolean;
+	/** Scheduling and broadcast settings */
+	settings?: CallSettings;
+}
+/**
+ * Options for joining a call.
+ * Pass to `call.join(options)` after preparing a call via `callClient.prepareCall(callId, mediaFlow)`.
+ *
+ * @example
+ * ```typescript
+ * const result = callClient.prepareCall('call-123', MediaFlow.P2P);
+ * result.data?.join({
+ *   audioSettings: { publishAudio: true },
+ *   videoSettings: { publishVideo: false }
+ * });
+ * ```
+ */
+export interface JoinCallOptions {
+	/** Audio publish settings for the call */
+	audioSettings?: AudioSettings;
+	/** Video publish settings for the call */
+	videoSettings?: VideoSettings;
+	/** Whether to use a media proxy server */
+	useMediaProxy?: boolean;
 	/** Optional array of audio tracks to use. If not provided, microphone will be requested. */
 	localAudioTracks?: MediaStreamTrack[];
-	/** Optional metadata to attach to the call (e.g., topic, channel ID) */
-	metadata?: CallMetadata;
-	/** User ID of the call creator. Usually set automatically. */
-	createdBy?: string;
+	/** Optional array of video tracks to use. If not provided, camera will be requested. */
+	localVideoTracks?: MediaStreamTrack[];
 }
 /**
  * Raw participant data as received from the server.
@@ -247,7 +281,7 @@ export interface IParticipant {
 	/** Current participation state */
 	state?: ParticipantState;
 	/** Current media connection state */
-	connectionState?: MediaConnectionState;
+	connectionState?: ParticipantConnectionState;
 	/** Whether the call was silenced for this participant */
 	isCallSilenced?: boolean;
 }
@@ -271,6 +305,9 @@ export interface ICall {
 	metadata: CallMetadata;
 	/** List of participants */
 	participants: IParticipant[];
+	/** Timestamp when the call started (milliseconds since epoch) */
+	createdAt?: number;
+	settings?: CallSettings;
 }
 /**
  * Participant information in a Call Detail Record (CDR).
@@ -291,6 +328,8 @@ export interface ICDRParticipant {
 	mediaConnectedAt: Long$1;
 	/** Final state of the participant (joined, declined, no_answer, etc.) */
 	state: string;
+	/** Whether the call was silenced for this participant */
+	isCallSilenced?: boolean;
 }
 /**
  * Call Detail Record (CDR) representing a historical call.
@@ -311,8 +350,8 @@ export interface ICDRParticipant {
  * ```
  */
 export interface ICallDetailRecord {
-	/** Server-assigned session identifier */
-	sessionId: string;
+	/** Server-assigned session identifier (int64 from proto) */
+	sessionId: Long$1;
 	/** Unique call identifier */
 	callId: string;
 	/** User ID of the call initiator */
@@ -322,7 +361,7 @@ export interface ICallDetailRecord {
 	/** Call metadata */
 	metadata: CallMetadata;
 	/** Call start timestamp (milliseconds since epoch) */
-	startedAt: number;
+	createdAt: number;
 	/** Call end timestamp (milliseconds since epoch) */
 	endedAt: number;
 	/** Final call state */
@@ -348,7 +387,11 @@ interface IGetRecentCallsResponse {
 	/** Array of call detail records */
 	records: ICallDetailRecord[];
 }
-interface CallClientResult<T> {
+/**
+ * Generic result wrapper for call client operations.
+ * Contains either a success response with data or an error.
+ */
+export interface CallClientResult<T> {
 	success?: boolean;
 	data?: T;
 	error?: SceytCallException;
@@ -396,6 +439,13 @@ export declare class Participant {
 	/** Current WebRTC connection state of the participant */
 	connectionState: ParticipantConnectionState;
 }
+interface ActiveSpeakerInfo {
+	participant: Participant;
+	audioLevel: number;
+	smoothedAudioLevel: number;
+	isSpeaking: boolean;
+	speakingStartTime: number;
+}
 type EventHandler<T> = (data: T) => void;
 export type Unsubscribe = () => void;
 declare class TypedEventEmitter<EventMap extends Record<string, any>> {
@@ -429,13 +479,6 @@ declare class TypedEventEmitter<EventMap extends Record<string, any>> {
 	 * @returns The number of listeners
 	 */
 	listenerCount<K extends keyof EventMap>(event: K): number;
-}
-interface ActiveSpeakerInfo {
-	participant: Participant;
-	audioLevel: number;
-	smoothedAudioLevel: number;
-	isSpeaking: boolean;
-	speakingStartTime: number;
 }
 /**
  * Event map for Call class.
@@ -484,7 +527,7 @@ export interface CallEventMap {
 		call: Call;
 		participant: Participant;
 		state: ParticipantState;
-		reason?: string;
+		reason?: string | number | undefined;
 	};
 	/** Fired when a participant's connection state changes */
 	participantConnectionStateChanged: {
@@ -502,7 +545,11 @@ export interface CallEventMap {
 	participantsAdded: {
 		call: Call;
 		participants: Participant[];
-		entryType: ParticipantEntryType;
+	};
+	/** Fired when participants are removed from the call */
+	participantsRemoved: {
+		call: Call;
+		participants: Participant[];
 	};
 	/** Fired when the active speakers list changes */
 	activeSpeakersChanged: {
@@ -518,6 +565,11 @@ export interface CallEventMap {
 	mediaFlowChanged: {
 		call: Call;
 		mediaFlow: MediaFlow;
+	};
+	/** Fired when the call session is renewed (new sessionId assigned by server) */
+	sessionRenewed: {
+		call: Call;
+		sessionId: string;
 	};
 }
 /**
@@ -584,6 +636,13 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	videoEnabled: boolean;
 	/** Whether the call was silenced (no ringtone) when initiated */
 	isCallSilenced: boolean;
+	/** Whether this is a video call */
+	videoCall: boolean;
+	/** Scheduling and broadcast settings for this call */
+	settings?: CallSettings;
+	/** Current list of active speakers in the call */
+	get activeSpeakers(): ActiveSpeakerInfo[];
+	set activeSpeakers(speakers: ActiveSpeakerInfo[]);
 	/**
 	 * Add new participants to the call.
 	 * The participants will receive an invitation to join.
@@ -597,6 +656,74 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	 * ```
 	 */
 	addParticipants(ids: string[]): CallClientResult<boolean>;
+	/**
+	 * Join this call with the given options.
+	 * The call must have been previously prepared via `callClient.prepareCall()`
+	 * or received via the `invitedToCall` event.
+	 *
+	 * @param options - Join options (audio settings, media proxy, local tracks)
+	 * @param createOptions - Optional create options to create-and-join in one step
+	 * @param errorCallback - Optional callback invoked if the server rejects the JOIN signal
+	 * @returns A `CallClientResult` containing this Call object on success
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = callClient.prepareCall('call-123', MediaFlow.P2P);
+	 * if (result.success && result.data) {
+	 *   result.data.join(
+	 *     { audioSettings: { publishAudio: true }, videoSettings: { publishVideo: false } },
+	 *     { participantIds: ['user2'] }
+	 *   );
+	 * }
+	 * ```
+	 */
+	join(options: JoinCallOptions, errorCallback?: (result: CallClientResult<Call>) => void): CallClientResult<Call>;
+	/**
+	 * Reject this incoming call.
+	 * Use this when the user declines to answer a call.
+	 *
+	 * @param reason - Optional reason for rejection (e.g., 'busy', 'declined')
+	 * @param errorCallback - Optional callback invoked if the server rejects the DECLINE signal
+	 *
+	 * @example
+	 * ```typescript
+	 * callClient.on('invitedToCall', ({ call }) => {
+	 *   call.reject('busy');
+	 * });
+	 * ```
+	 */
+	reject(reason?: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	/**
+	 * Leave this active call.
+	 * This ends your participation in the call. Other participants will continue.
+	 *
+	 * @example
+	 * ```typescript
+	 * call.leave();
+	 * ```
+	 */
+	leave(): CallClientResult<boolean>;
+	/**
+	 * Create a call link without joining.
+	 * Participants in `participantIds` will receive an INVITE from the server.
+	 * The creator does not join automatically — call `call.join(options)` to participate.
+	 *
+	 * @param options - Call creation options (participantIds, metadata, videoCall, settings)
+	 * @param errorCallback - Optional callback invoked if the server rejects the CREATE signal
+	 * @returns A `CallClientResult` indicating success or failure
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = callClient.prepareCall('my-call-link', MediaFlow.SFU);
+	 * if (result.success && result.data) {
+	 *   result.data.create({
+	 *     participantIds: ['user1', 'user2'],
+	 *     metadata: { topic: 'Team standup' }
+	 *   });
+	 * }
+	 * ```
+	 */
+	create(errorCallback?: (result: CallClientResult<Call>) => void): CallClientResult<Call>;
 	/**
 	 * Switch the call from P2P (peer-to-peer) to SFU (Selective Forwarding Unit) mode.
 	 * Use this when adding more participants to a P2P call or when you need server-side media routing.
@@ -659,6 +786,14 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	 */
 	get muted(): boolean;
 	/**
+	 * Set the muted state. Use `startScreenShare() or stopScreenShare` method instead to also notify other participants.
+	 */
+	set screenSharing(muted: boolean);
+	/**
+	 * Whether the local participant's microphone is muted.
+	 */
+	get screenSharing(): boolean;
+	/**
 	 * Set the hold state. Use `hold()` method instead to also notify other participants.
 	 */
 	set onHold(onHold: boolean);
@@ -681,7 +816,7 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	 * await call.enableVideo(false);
 	 * ```
 	 */
-	enableVideo(videoEnabled: boolean, errorCallback?: (result: CallClientResult<boolean>) => void, screenShareAction?: boolean): Promise<CallClientResult<boolean>>;
+	enableVideo(videoEnabled: boolean, errorCallback?: (result: CallClientResult<boolean>) => void): Promise<CallClientResult<boolean>>;
 	/**
 	 * Start sharing your screen with other participants.
 	 * This will prompt the user to select a screen, window, or tab to share.
@@ -907,20 +1042,23 @@ declare class RecentCallQueryBuilder extends QueryBuilder {
  * });
  *
  * // Start a new call
- * const call = callClient.join({
- *   id: 'my-call-id',
- *   participantIds: ['user1', 'user2'],
- *   mediaFlow: MediaFlow.P2P
- * });
+ * const result = callClient.prepareCall('my-call-id');
  *
- * // Handle call events
- * call.on('callStateChanged', ({ state }) => {
- *   console.log(`Call state: ${state}`);
- * });
+ * if (result.success && result.data) {
+ *   const call = result.data;
+ *   // Handle call events
+ *   call.on('callStateChanged', ({ state }) => {
+ *     console.log(`Call state: ${state}`);
+ *   });
+ *   // Join when ready
+ *   call.join(
+ *     { audioSettings: { publishAudio: true }, videoSettings: { publishVideo: true } },
+ *     { participantIds: ['user1', 'user2'] }
+ *   );
+ * }
  * ```
  */
 export declare class SceytCallClient extends TypedEventEmitter<CallClientEventMap> {
-	private sendSignalValidator;
 	/**
 	 * Create a new SceytCallClient instance.
 	 *
@@ -944,76 +1082,42 @@ export declare class SceytCallClient extends TypedEventEmitter<CallClientEventMa
 	 */
 	get activeCalls(): Call[];
 	/**
-	 * Join or create a call.
-	 * Use this to start a new call or accept an incoming call invitation.
+	 * Prepare a new call without joining it.
+	 * Creates a Call object and registers it in `activeCalls`,
+	 * but does not send any signaling or start media connections.
+	 * Call `call.create(options)` or `call.join(options)` when ready.
 	 *
-	 * @param options - Call configuration options
-	 * @returns The Call object if successful, null otherwise
-	 * @throws Error if the call fails to initialize
+	 * @param callId - Unique identifier for the call
+	 * @param createOptions - Optional call configuration (participants, settings, metadata)
 	 *
 	 * @example
 	 * ```typescript
-	 * // Start a P2P call with audio only
-	 * const call = callClient.join({
-	 *   id: 'call-123',
-	 *   participantIds: ['user2'],
-	 *   mediaFlow: MediaFlow.P2P
+	 * const result = callClient.prepareCall('call-123', {
+	 *   participantIds: ['user1', 'user2'],
+	 *   settings: { startsAt: Date.now() }
 	 * });
-	 *
-	 * // Start a group call with SFU
-	 * const groupCall = callClient.join({
-	 *   id: 'group-call',
-	 *   participantIds: ['user2', 'user3', 'user4'],
-	 *   mediaFlow: MediaFlow.SFU,
-	 *   metadata: { topic: 'Team meeting' }
-	 * });
-	 * ```
-	 */
-	join: (options: IJoinCallOptions, errorCallback?: (result: CallClientResult<Call>) => void) => CallClientResult<Call>;
-	/**
-	 * Reject an incoming call.
-	 * Use this when the user declines to answer a call.
-	 *
-	 * @param call - The call to reject
-	 * @param reason - Optional reason for rejection (e.g., 'busy', 'declined')
-	 *
-	 * @example
-	 * ```typescript
-	 * callClient.on('invitedToCall', ({ call }) => {
-	 *   // User clicked "Decline"
-	 *   callClient.reject(call, 'busy');
-	 * });
-	 * ```
-	 */
-	reject: (call: Call, reason?: string, errorCallback?: (result: CallClientResult<boolean>) => void) => CallClientResult<boolean>;
-	/**
-	 * Leave an active call.
-	 * This ends your participation in the call. Other participants will continue.
-	 *
-	 * @param call - The call to leave
-	 *
-	 * @example
-	 * ```typescript
-	 * // End your participation in the call
-	 * callClient.leave(call);
-	 * ```
-	 */
-	leave: (call: Call) => CallClientResult<boolean>;
-	/**
-	 * Get a specific call by its ID.
-	 *
-	 * @param id - The unique identifier of the call
-	 * @returns The Call object if found, undefined otherwise
-	 *
-	 * @example
-	 * ```typescript
-	 * const call = callClient.getCall('call-123');
-	 * if (call) {
-	 *   console.log(`Call state: ${call.state}`);
+	 * if (result.success && result.data) {
+	 *   result.data.create();
 	 * }
 	 * ```
 	 */
-	getCall: (id: string) => Call | undefined;
+	prepareCall(callId: string, createOptions?: CreateCallOptions): CallClientResult<Call>;
+	/**
+	 * Get a call by its ID. Returns the local active call if found,
+	 * otherwise fetches it from the server.
+	 *
+	 * @param callId - The unique identifier of the call
+	 * @returns A promise resolving to the Call object
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await callClient.getCall('call-123');
+	 * if (result.success && result.data) {
+	 *   console.log(`Call state: ${result.data.state}`);
+	 * }
+	 * ```
+	 */
+	getCall: (callId: string) => Promise<CallClientResult<Call>>;
 	/**
 	 * Refresh and get the list of all ongoing calls.
 	 * This fetches the latest call information from the server.
