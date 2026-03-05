@@ -327,4 +327,4 @@ import type {
 
 ## License
 
-See the [LICENSE](LICENSE.txt) file for details.
+See the [LICENSE](https://github.com/sceyt/sceyt-call-js-sdk/blob/HEAD/LICENSE.txt) file for details.

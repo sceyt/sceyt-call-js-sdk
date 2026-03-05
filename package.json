@@ -25,5 +25,6 @@
     "webrtc-adapter": "^8.2.3",
     "long": "^5.2.3",
     "sceyt-chat": "^1.6.7"
-  }
+  },
+  "license" : "SEE LICENSE IN LICENSE.txt"
 }
