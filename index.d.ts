@@ -208,6 +208,10 @@ export interface CallSettings {
 	broadcastSettings?: BroadcastSettings;
 	/** Whether the call is persistent (survives all participants leaving) */
 	persistent?: boolean;
+	/** Whether to notify participants when someone joins */
+	notifyOnParticipantJoin?: boolean;
+	/** Maximum number of participants allowed in the call */
+	maxParticipantsCount?: number;
 }
 /**
  * Options for creating a call.
