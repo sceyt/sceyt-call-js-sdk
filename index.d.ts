@@ -1115,13 +1115,13 @@ export declare class SceytCallClient extends TypedEventEmitter<CallClientEventMa
 	 *
 	 * @example
 	 * ```typescript
-	 * const result = await callClient.getCall('call-123');
+	 * const result = await callClient.fetchCall('call-123');
 	 * if (result.success && result.data) {
 	 *   console.log(`Call state: ${result.data.state}`);
 	 * }
 	 * ```
 	 */
-	getCall: (callId: string) => Promise<CallClientResult<Call>>;
+	fetchCall: (callId: string) => Promise<CallClientResult<Call>>;
 	/**
 	 * Refresh and get the list of all ongoing calls.
 	 * This fetches the latest call information from the server.
