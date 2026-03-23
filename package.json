@@ -1,6 +1,6 @@
 {
   "name": "sceyt-call",
-  "version": "1.2.7-beta.4",
+  "version": "1.2.7-beta.5",
   "description": "JavaScript Call SDK",
   "main": "index.js",
   "types": "index.d.ts",

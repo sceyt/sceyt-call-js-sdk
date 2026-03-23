@@ -313,15 +313,15 @@ export interface ICall {
 	participants: IParticipant[];
 	/** Timestamp when the call started (milliseconds since epoch) */
 	createdAt?: number;
-	settings?: CallSettings;
+	options?: SignalCallOptions;
 }
 /**
  * Participant information in a Call Detail Record (CDR).
  * Represents historical data about a participant's involvement in a past call.
  */
 export interface ICDRParticipant {
-	/** User ID of the participant */
-	userId: string;
+	/** Full user object of the participant */
+	user: IUser;
 	/** Client ID of the participant */
 	clientId: string;
 	/** Whether this participant initiated the call */
@@ -333,7 +333,7 @@ export interface ICDRParticipant {
 	/** Timestamp when media connection was established */
 	mediaConnectedAt: Long$1;
 	/** Final state of the participant (joined, declined, no_answer, etc.) */
-	state: string;
+	state: ParticipantState;
 	/** Whether the call was silenced for this participant */
 	isCallSilenced?: boolean;
 }
@@ -367,7 +367,7 @@ export interface ICallDetailRecord {
 	/** Call metadata */
 	metadata: CallMetadata;
 	/** Call start timestamp (milliseconds since epoch) */
-	createdAt: number;
+	startedAt: number;
 	/** Call end timestamp (milliseconds since epoch) */
 	endedAt: number;
 	/** Final call state */
@@ -644,6 +644,8 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	isCallSilenced: boolean;
 	/** Whether this is a video call */
 	videoCall: boolean;
+	/** Call type identifier (e.g. "audio", "video") */
+	callType?: string;
 	/** Scheduling and broadcast settings for this call */
 	settings?: CallSettings;
 	/** Current list of active speakers in the call */
