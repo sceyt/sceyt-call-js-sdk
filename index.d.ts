@@ -212,6 +212,8 @@ export interface CallSettings {
 	notifyOnParticipantJoin?: boolean;
 	/** Maximum number of participants allowed in the call */
 	maxParticipantsCount?: number;
+	/** Type identifier for the call (e.g. 'audio', 'video', custom string) */
+	callType?: string;
 }
 /**
  * Options for creating a call.
@@ -728,6 +730,7 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	 * ```
 	 */
 	create(errorCallback?: (result: CallClientResult<Call>) => void): CallClientResult<Call>;
+	kickParticipants(ids: string[]): CallClientResult<boolean>;
 	/**
 	 * Switch the call from P2P (peer-to-peer) to SFU (Selective Forwarding Unit) mode.
 	 * Use this when adding more participants to a P2P call or when you need server-side media routing.
