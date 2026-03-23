@@ -729,7 +729,7 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	 * }
 	 * ```
 	 */
-	create(errorCallback?: (result: CallClientResult<Call>) => void): CallClientResult<Call>;
+	create(): Promise<CallClientResult<Call>>;
 	kickParticipants(ids: string[]): CallClientResult<boolean>;
 	/**
 	 * Switch the call from P2P (peer-to-peer) to SFU (Selective Forwarding Unit) mode.
