@@ -24,7 +24,7 @@
     "uuid": "^9.0.1",
     "webrtc-adapter": "^8.2.3",
     "long": "^5.2.3",
-    "sceyt-chat": "^1.6.8-beta.4"
+    "sceyt-chat": "^1.6.8-beta.5"
   },
   "license" : "SEE LICENSE IN LICENSE.txt"
 }

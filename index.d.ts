@@ -265,6 +265,21 @@ export interface JoinCallOptions {
 	/** Optional array of video tracks to use. If not provided, camera will be requested. */
 	localVideoTracks?: MediaStreamTrack[];
 }
+interface SignalCallSettings {
+	broadcastOptions?: {
+		enabled: boolean;
+		url?: string;
+	};
+	startsAt?: Long$1;
+	expiresAt?: Long$1;
+	persistent?: boolean;
+	notifyOnParticipantJoin?: boolean;
+	maxParticipantsCount?: number;
+}
+interface SignalCallOptions {
+	settings?: SignalCallSettings;
+	callType?: string;
+}
 /**
  * Raw participant data as received from the server.
  * Use the `Participant` class for a richer API.
@@ -314,6 +329,21 @@ export interface ICall {
 	/** Timestamp when the call started (milliseconds since epoch) */
 	createdAt?: number;
 	options?: SignalCallOptions;
+}
+interface IPresence {
+	state: ParticipantState;
+	status: string;
+	lastActiveAt: Date;
+}
+interface IUser {
+	id: string;
+	firstName: string;
+	lastName: string;
+	avatarUrl: string;
+	metadata: string;
+	blocked: boolean;
+	presence: IPresence;
+	state: "active" | "inactive" | "deleted";
 }
 /**
  * Participant information in a Call Detail Record (CDR).
@@ -374,6 +404,8 @@ export interface ICallDetailRecord {
 	state: string;
 	/** List of participants with their individual CDR data */
 	participants: ICDRParticipant[];
+	/** Call type identifier */
+	callType?: string;
 }
 interface ICDRResponse {
 	/** Type of CDR request */
@@ -1024,6 +1056,7 @@ declare class RecentCallQueryBuilder extends QueryBuilder {
 	direction: CDRRequestDirection;
 	chatClient: any;
 	sessionIdList?: Long$1[];
+	callTypes?: string[];
 	setSessionIdList: (sessionIdList: Long$1[]) => this;
 	setEvent: (event: CDRRequestEvent) => this;
 	setSessionId: (sessionId: number) => this;
@@ -1031,6 +1064,7 @@ declare class RecentCallQueryBuilder extends QueryBuilder {
 	setParticipantCount: (count: number) => this;
 	setOrder: (order: CDRRequestOrder) => this;
 	setDirection: (direction: CDRRequestDirection) => this;
+	setCallTypes: (callTypes: string[]) => this;
 	build: () => RecentCallQuery;
 }
 /**
