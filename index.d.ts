@@ -195,6 +195,7 @@ export interface VideoSettings {
 export interface BroadcastSettings {
 	/** Whether broadcast mode is enabled */
 	enabled: boolean;
+	url?: string;
 }
 /**
  * Scheduling and broadcast settings for a call.
