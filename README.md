@@ -106,7 +106,8 @@ const mics = await call.getAvailableAudioDevices();
 await call.selectAudioDevice(mics[0].deviceId);
 
 // Participants
-await call.addParticipants(['user3', 'user4']);
+call.addParticipants(['user3', 'user4']);
+call.kickParticipants(['user3']);
 await call.switchToSFU();  // Upgrade P2P to SFU
 ```
 
@@ -143,8 +144,8 @@ if (!prepareResult.success) console.error(prepareResult.error?.message);
 const joinResult = call.join({ audioSettings: { publishAudio: true } }, handleError);
 if (!joinResult.success) console.error(joinResult.error?.message);
 
-// Create without joining — optional async signal error callback
-call.create(handleError);
+// Create without joining — await the result for errors
+await call.create();
 
 // Ringing notification — optional async signal error callback
 call.sendRinging(handleError);
@@ -163,7 +164,7 @@ await call.switchToSFU(handleError);
 **Methods Supporting Error Callbacks:**
 - `callClient.prepareCall(callId, options?)` — check return value
 - `call.join(options, errorCallback?)` — signal rejection delivered via callback
-- `call.create(errorCallback?)` — server CREATE rejection delivered via callback
+- `call.create()` — await result for server CREATE errors
 - `call.sendRinging(errorCallback?)` — signal error delivered via callback
 - `call.reject(reason?, errorCallback?)` — signal error delivered via callback
 - `call.enableVideo(enabled, errorCallback?)` — camera/signal errors via callback
@@ -243,8 +244,8 @@ const call = result.data;
 // Join — moves call from prepareCalls to activeCalls
 call?.join({ audioSettings: { publishAudio: true } });
 
-// Create without joining (sends invites, stays in prepareCalls until server confirms)
-call?.create((error) => console.error(error.error?.message));
+// Create without joining (sends invites to participants)
+await call?.create();
 
 // Accept an incoming call
 callClient.on('invitedToCall', ({ call }) => {
@@ -255,17 +256,14 @@ callClient.on('invitedToCall', ({ call }) => {
 call?.reject('busy');
 call?.leave();
 
-// Calls prepared but not yet joined
-const pendingCalls = callClient.prepareCalls;
-
-// Calls actively joined
+// All active (joined) calls
 const activeCalls = callClient.activeCalls;
 
 // Active speakers on a call (updated via 'activeSpeakersChanged' event)
 const speakers = call?.activeSpeakers;
 
 // Fetch a call by ID (local first, then server)
-const { data } = await callClient.getCall('call-id');
+const { data } = await callClient.fetchCall('call-id');
 ```
 
 ## Call History (CDR)
@@ -315,7 +313,8 @@ Full TypeScript support with exported types:
 import type {
   Call,
   Participant,
-  IJoinCallOptions,
+  JoinCallOptions,
+  CreateCallOptions,
   CallEventMap,
   CallClientEventMap,
   ICallDetailRecord,

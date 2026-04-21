@@ -828,11 +828,11 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	 */
 	get muted(): boolean;
 	/**
-	 * Set the muted state. Use `startScreenShare() or stopScreenShare` method instead to also notify other participants.
+	 * Set the screen-sharing state directly. Use `startScreenShare()` or `stopScreenShare()` instead to also notify other participants.
 	 */
-	set screenSharing(muted: boolean);
+	set screenSharing(value: boolean);
 	/**
-	 * Whether the local participant's microphone is muted.
+	 * Whether the local participant is currently sharing their screen.
 	 */
 	get screenSharing(): boolean;
 	/**
