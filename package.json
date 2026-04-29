@@ -1,6 +1,6 @@
 {
   "name": "sceyt-call",
-  "version": "1.2.9",
+  "version": "1.3.0",
   "description": "JavaScript Call SDK",
   "main": "index.js",
   "types": "index.d.ts",
@@ -24,7 +24,7 @@
     "uuid": "^9.0.1",
     "webrtc-adapter": "^8.2.3",
     "long": "^5.2.3",
-    "sceyt-chat": "^1.6.9"
+    "sceyt-chat": "^1.7.0"
   },
   "license" : "SEE LICENSE IN LICENSE.txt"
 }
