@@ -13,6 +13,8 @@ JavaScript SDK for real-time voice and video calls with WebRTC. This SDK works a
 * [Call Events](#call-events)
 * [Client Events](#client-events)
 * [Call Management](#call-management)
+* [Remote Participant Control](#remote-participant-control)
+* [Call Permissions](#call-permissions)
 * [Call History (CDR)](#call-history-cdr)
 * [Participant States](#participant-states)
 * [Logging](#logging)
@@ -90,7 +92,7 @@ call.on('participantStateChanged', ({ participant, state }) => {
 ```typescript
 // Audio controls
 call.mute(true);       // Mute microphone
-call.mute(false);      // Unmute
+call.mute(false);      // Unmute (blocked if hard-muted by host or call audio is locked)
 call.hold(true);       // Put on hold
 
 // Video controls
@@ -170,7 +172,7 @@ await call.switchToSFU(handleError);
 - `call.enableVideo(enabled, errorCallback?)` — camera/signal errors via callback
 - `call.startScreenShare(errorCallback?)` — screen share errors via callback
 - `call.stopScreenShare(errorCallback?)` — signal errors via callback
-- `call.mute(mute, errorCallback?)` — signal errors via callback
+- `call.mute(mute, errorCallback?)` — signal errors via callback; returns error immediately if hard-muted
 - `call.switchToSFU(errorCallback?)` — signal errors via callback
 - `call.leave()` — no callback, check return value
 
@@ -206,8 +208,10 @@ call.on('videoTrackAdded', ({ participant, track }) => {
   videoElement.srcObject = new MediaStream([track]);
 });
 
-call.on('participantEvent', ({ participant, event }) => {
-  // event: 'Mute' | 'Unmute' | 'Hold' | 'VideoEnabled' | etc.
+call.on('participantEvent', ({ participant, event, changedBy }) => {
+  // event: 'Mute' | 'Unmute' | 'Hold' | 'VideoEnabled' | 'VideoDisabled' |
+  //        'ScreenSharingStarted' | 'ScreenSharingStopped' | etc.
+  // changedBy: userId of whoever triggered the change (e.g. a host muting a participant)
 });
 
 call.on('activeSpeakersChanged', ({ activeSpeakers }) => {
@@ -216,6 +220,18 @@ call.on('activeSpeakersChanged', ({ activeSpeakers }) => {
 
 call.on('sessionRenewed', ({ call, sessionId }) => {
   // Fired when the server assigns a new sessionId to an existing call
+});
+
+call.on('callPermissionsUpdated', ({ call, permissions }) => {
+  // Fired when the host updates call-level audio/video permissions
+  console.log('Audio allowed:', permissions.allowPublishAudio);
+  console.log('Video allowed:', permissions.allowPublishVideo);
+});
+
+call.on('participantPermissionsUpdated', ({ call, participant, permissions }) => {
+  // Fired when a participant's individual permissions are updated by the host
+  console.log(`${participant.id} canPublishAudio: ${permissions.canPublishAudio}`);
+  console.log(`${participant.id} canPublishVideo: ${permissions.canPublishVideo}`);
 });
 ```
 
@@ -264,6 +280,103 @@ const speakers = call?.activeSpeakers;
 
 // Fetch a call by ID (local first, then server)
 const { data } = await callClient.fetchCall('call-id');
+```
+
+## Remote Participant Control
+
+Host participants can mute, disable video, or update permissions for other participants in the call. All methods return `CallClientResult<boolean>` and accept an optional error callback.
+
+### Mute / Unmute Remote Participants
+
+```typescript
+// Mute a specific participant (soft-mute — they can unmute themselves)
+call.muteRemoteParticipant('user1');
+
+// Hard-mute: revoke publish-audio permission (they cannot unmute)
+call.disableRemoteParticipantAudio('user1');
+
+// Restore audio permission (allow them to unmute)
+call.enableRemoteParticipantAudio('user1');
+// or equivalently:
+call.unmuteRemoteParticipant('user1');
+
+// Mute all participants at once
+call.muteAllRemoteParticipants();
+```
+
+### Disable Video for Remote Participants
+
+```typescript
+// Turn off a specific participant's video
+call.disableRemoteParticipantVideo('user1');
+// or equivalently:
+call.videoOffRemoteParticipant('user1');
+
+// Turn off video for all participants
+call.videoOffAllRemoteParticipants();
+// or equivalently:
+call.disableAllRemoteParticipantsVideo();
+```
+
+### Update Participant Permissions
+
+```typescript
+import type { IParticipantPermissions } from 'sceyt-call';
+
+// Grant or revoke individual publish permissions
+call.updateParticipantPermissions('user1', {
+  canPublishAudio: true,
+  canPublishVideo: false,
+});
+```
+
+## Call Permissions
+
+The host can lock audio or video at the call level, preventing all participants from publishing.
+
+```typescript
+import type { ICallPermissions } from 'sceyt-call';
+
+// Lock audio for the entire call
+call.disableCallAudio();
+
+// Restore audio for the entire call
+call.enableCallAudio();
+
+// Lock video for the entire call
+call.disableCallVideo();
+
+// Restore video for the entire call
+call.enableCallVideo();
+
+// Update both at once
+call.updateCallPermissions({ allowPublishAudio: false, allowPublishVideo: true });
+```
+
+Current call-level permissions are exposed on the `call.permissions` property:
+
+```typescript
+console.log(call.permissions?.allowPublishAudio); // boolean | undefined
+console.log(call.permissions?.allowPublishVideo); // boolean | undefined
+```
+
+### Participant-level media state
+
+Each participant now exposes a structured `mediaState` object instead of the old flat `muted`, `videoEnabled`, and `screenSharing` boolean fields:
+
+```typescript
+const p = call.participants[0];
+
+console.log(p.mediaState?.audio.enabled);           // mic on/off
+console.log(p.mediaState?.video.enabled);           // camera on/off
+console.log(p.mediaState?.screenShare.enabled);     // screen share on/off
+
+// changedBy tells you who last changed the state (e.g. a host action)
+console.log(p.mediaState?.audio.changedBy);
+
+// Individual publish permissions assigned by the host
+console.log(p.permissions?.canPublishAudio);
+console.log(p.permissions?.canPublishVideo);
 ```
 
 ## Call History (CDR)
@@ -318,6 +431,10 @@ import type {
   CallEventMap,
   CallClientEventMap,
   ICallDetailRecord,
+  ICallPermissions,
+  IParticipantPermissions,
+  IParticipantMediaState,
+  IMediaState,
   ParticipantState,
   CallState,
   MediaFlow

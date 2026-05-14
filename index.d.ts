@@ -215,6 +215,8 @@ export interface CallSettings {
 	maxParticipantsCount?: number;
 	/** Type identifier for the call (e.g. 'audio', 'video', custom string) */
 	callType?: string;
+	/** Call-level audio/video permissions set by the owner */
+	permissions: ICallPermissions;
 }
 /**
  * Options for creating a call.
@@ -276,10 +278,28 @@ interface SignalCallSettings {
 	persistent?: boolean;
 	notifyOnParticipantJoin?: boolean;
 	maxParticipantsCount?: number;
+	permissions: ICallPermissions;
 }
 interface SignalCallOptions {
 	settings?: SignalCallSettings;
 	callType?: string;
+}
+interface IMediaState {
+	enabled: boolean;
+	changedBy?: string;
+}
+interface IParticipantMediaState {
+	audio: IMediaState;
+	video: IMediaState;
+	screenShare: IMediaState;
+}
+interface IParticipantPermissions {
+	canPublishAudio: boolean;
+	canPublishVideo: boolean;
+}
+interface ICallPermissions {
+	allowPublishAudio: boolean;
+	allowPublishVideo: boolean;
 }
 /**
  * Raw participant data as received from the server.
@@ -292,10 +312,6 @@ export interface IParticipant {
 	clientId: string;
 	/** Whether this participant is the presenter */
 	presenter?: boolean;
-	/** Whether the participant's camera is on */
-	videoEnabled?: boolean;
-	/** Whether the participant's microphone is muted */
-	muted?: boolean;
 	/** Whether the participant is on hold */
 	onHold?: boolean;
 	/** Whether the participant is sharing their screen */
@@ -306,6 +322,10 @@ export interface IParticipant {
 	connectionState?: ParticipantConnectionState;
 	/** Whether the call was silenced for this participant */
 	isCallSilenced?: boolean;
+	/** Combined media track states */
+	mediaState?: IParticipantMediaState;
+	/** What this participant is allowed to publish */
+	permissions?: IParticipantPermissions;
 }
 type CallMetadata = {
 	[key: string]: string | number;
@@ -461,14 +481,8 @@ export declare class Participant {
 	id: string;
 	/** Client identifier for multi-device support. Empty string if not applicable. */
 	clientId: string;
-	/** Whether the participant's microphone is muted */
-	muted: boolean;
 	/** Whether the participant is on hold */
 	onHold: boolean;
-	/** Whether the participant's camera is enabled */
-	videoEnabled: boolean;
-	/** Whether the participant is sharing their screen */
-	screenSharing: boolean;
 	/** Array of audio tracks from this participant. Use these to play participant's audio. */
 	audioTracks: MediaStreamTrack[];
 	/** Array of video tracks from this participant. Use these to display participant's video. */
@@ -477,6 +491,10 @@ export declare class Participant {
 	state: ParticipantState;
 	/** Current WebRTC connection state of the participant */
 	connectionState: ParticipantConnectionState;
+	/** Combined media track states (audio, video, screenShare) */
+	mediaState?: IParticipantMediaState;
+	/** What this participant is allowed to publish */
+	permissions?: IParticipantPermissions;
 }
 interface ActiveSpeakerInfo {
 	participant: Participant;
@@ -579,6 +597,7 @@ export interface CallEventMap {
 		call: Call;
 		participant: Participant;
 		event: ParticipantEvent;
+		changedBy?: string;
 	};
 	/** Fired when participants are added to the call */
 	participantsAdded: {
@@ -609,6 +628,17 @@ export interface CallEventMap {
 	sessionRenewed: {
 		call: Call;
 		sessionId: string;
+	};
+	/** Fired when the owner updates call-level audio/video permissions */
+	callPermissionsUpdated: {
+		call: Call;
+		permissions: ICallPermissions;
+	};
+	/** Fired when a participant's individual permissions are updated by the owner */
+	participantPermissionsUpdated: {
+		call: Call;
+		participant: Participant;
+		permissions: IParticipantPermissions;
 	};
 }
 /**
@@ -681,6 +711,8 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	callType?: string;
 	/** Scheduling and broadcast settings for this call */
 	settings?: CallSettings;
+	/** Current call-level audio/video permissions set by the owner */
+	permissions?: ICallPermissions;
 	/** Current list of active speakers in the call */
 	get activeSpeakers(): ActiveSpeakerInfo[];
 	set activeSpeakers(speakers: ActiveSpeakerInfo[]);
@@ -793,6 +825,21 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	 * ```
 	 */
 	mute(mute: boolean, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	muteAllRemoteParticipants(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	videoOffAllRemoteParticipants(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	disableAllRemoteParticipantsVideo(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	updateParticipantPermissions(id: string, permissions: IParticipantPermissions, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	muteRemoteParticipant(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	disableRemoteParticipantAudio(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	enableRemoteParticipantAudio(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	enableCallAudio(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	disableCallAudio(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	unmuteRemoteParticipant(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	disableRemoteParticipantVideo(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	videoOffRemoteParticipant(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	disableCallVideo(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	enableCallVideo(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
+	updateCallPermissions(permissions: ICallPermissions, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	/**
 	 * Put the call on hold or resume it.
 	 * When on hold, audio/video is paused but the call remains active.
