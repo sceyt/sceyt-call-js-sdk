@@ -297,8 +297,6 @@ call.disableRemoteParticipantAudio('user1');
 
 // Restore audio permission (allow them to unmute)
 call.enableRemoteParticipantAudio('user1');
-// or equivalently:
-call.unmuteRemoteParticipant('user1');
 
 // Mute all participants at once
 call.muteAllRemoteParticipants();

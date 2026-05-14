@@ -834,7 +834,6 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	enableRemoteParticipantAudio(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	enableCallAudio(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	disableCallAudio(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
-	unmuteRemoteParticipant(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	disableRemoteParticipantVideo(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	videoOffRemoteParticipant(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	disableCallVideo(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
