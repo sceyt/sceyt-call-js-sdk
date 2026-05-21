@@ -826,18 +826,10 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	 */
 	mute(mute: boolean, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	muteAllRemoteParticipants(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
-	videoOffAllRemoteParticipants(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	disableAllRemoteParticipantsVideo(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	updateParticipantPermissions(id: string, permissions: IParticipantPermissions, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	muteRemoteParticipant(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
-	disableRemoteParticipantAudio(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
-	enableRemoteParticipantAudio(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
-	enableCallAudio(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
-	disableCallAudio(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	disableRemoteParticipantVideo(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
-	videoOffRemoteParticipant(id: string, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
-	disableCallVideo(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
-	enableCallVideo(errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	updateCallPermissions(permissions: ICallPermissions, errorCallback?: (result: CallClientResult<boolean>) => void): CallClientResult<boolean>;
 	/**
 	 * Put the call on hold or resume it.

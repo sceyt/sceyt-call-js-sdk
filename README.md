@@ -292,12 +292,6 @@ Host participants can mute, disable video, or update permissions for other parti
 // Mute a specific participant (soft-mute — they can unmute themselves)
 call.muteRemoteParticipant('user1');
 
-// Hard-mute: revoke publish-audio permission (they cannot unmute)
-call.disableRemoteParticipantAudio('user1');
-
-// Restore audio permission (allow them to unmute)
-call.enableRemoteParticipantAudio('user1');
-
 // Mute all participants at once
 call.muteAllRemoteParticipants();
 ```
@@ -305,14 +299,10 @@ call.muteAllRemoteParticipants();
 ### Disable Video for Remote Participants
 
 ```typescript
-// Turn off a specific participant's video
+// Disable video for a specific participant
 call.disableRemoteParticipantVideo('user1');
-// or equivalently:
-call.videoOffRemoteParticipant('user1');
 
-// Turn off video for all participants
-call.videoOffAllRemoteParticipants();
-// or equivalently:
+// Disable video for all participants
 call.disableAllRemoteParticipantsVideo();
 ```
 
@@ -335,19 +325,7 @@ The host can lock audio or video at the call level, preventing all participants 
 ```typescript
 import type { ICallPermissions } from 'sceyt-call';
 
-// Lock audio for the entire call
-call.disableCallAudio();
-
-// Restore audio for the entire call
-call.enableCallAudio();
-
-// Lock video for the entire call
-call.disableCallVideo();
-
-// Restore video for the entire call
-call.enableCallVideo();
-
-// Update both at once
+// Update call permissions
 call.updateCallPermissions({ allowPublishAudio: false, allowPublishVideo: true });
 ```
 
