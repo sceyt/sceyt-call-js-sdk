@@ -713,6 +713,8 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	settings?: CallSettings;
 	/** Current call-level audio/video permissions set by the owner */
 	permissions?: ICallPermissions;
+	/** Whether to force TURN relay (RELAY transport policy) for P2P calls */
+	useMediaProxy: boolean;
 	/** Current list of active speakers in the call */
 	get activeSpeakers(): ActiveSpeakerInfo[];
 	set activeSpeakers(speakers: ActiveSpeakerInfo[]);
