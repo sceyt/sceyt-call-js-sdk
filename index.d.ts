@@ -326,6 +326,8 @@ export interface IParticipant {
 	mediaState?: IParticipantMediaState;
 	/** What this participant is allowed to publish */
 	permissions?: IParticipantPermissions;
+	/** Timestamp when the participant joined the call (milliseconds since epoch) */
+	joinedAt?: Long$1 | number;
 }
 type CallMetadata = {
 	[key: string]: string | number;
@@ -489,6 +491,8 @@ export declare class Participant {
 	videoTracks: MediaStreamTrack[];
 	/** Current state of the participant in the call (Idle, Ringing, Joined, Left, etc.) */
 	state: ParticipantState;
+	/** Timestamp (ms since epoch) of when the participant most recently joined the call. Undefined while not joined. */
+	joinedAt?: number;
 	/** Current WebRTC connection state of the participant */
 	connectionState: ParticipantConnectionState;
 	/** Combined media track states (audio, video, screenShare) */
