@@ -541,6 +541,7 @@ declare class TypedEventEmitter<EventMap extends Record<string, any>> {
 	 */
 	listenerCount<K extends keyof EventMap>(event: K): number;
 }
+export type LocalAudioCaptureStatus = "active" | "recovering" | "failed";
 /**
  * Event map for Call class.
  * Use with `call.on(eventName, handler)` to subscribe to events.
@@ -556,6 +557,12 @@ declare class TypedEventEmitter<EventMap extends Record<string, any>> {
  * ```
  */
 export interface CallEventMap {
+	/** Fired when local microphone capture or sender recovery changes state. */
+	localAudioCaptureStatusChanged: {
+		call: Call;
+		status: LocalAudioCaptureStatus;
+		error?: Error;
+	};
 	/** Fired when an audio track is added for a participant */
 	audioTrackAdded: {
 		call: Call;
@@ -705,6 +712,7 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	metadata?: CallMetadata;
 	/** Current state of the call (Idle, Connecting, Connected, Closed) */
 	state: CallState;
+	private _localAudioCaptureStatus;
 	/** Whether video is currently enabled for the local participant */
 	videoEnabled: boolean;
 	/** Whether the call was silenced (no ringtone) when initiated */
@@ -858,6 +866,10 @@ export declare class Call extends TypedEventEmitter<CallEventMap> {
 	 * @returns Array of MediaStreamTrack objects for audio
 	 */
 	get localAudioTracks(): MediaStreamTrack[];
+	/** Current health of the local microphone capture and publishing sender. */
+	get localAudioCaptureStatus(): LocalAudioCaptureStatus;
+	/** Retry capture and publishing after a local microphone failure. */
+	retryLocalAudio(): Promise<CallClientResult<boolean>>;
 	/**
 	 * Get the local video tracks being sent in this call.
 	 * @returns Array of MediaStreamTrack objects for video
