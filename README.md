@@ -107,6 +107,16 @@ await call.selectVideoDevice(cameras[0].deviceId);
 const mics = await call.getAvailableAudioDevices();
 await call.selectAudioDevice(mics[0].deviceId);
 
+// Capture health is separate from the signaled mute state.
+// After permission denial, an SDK-captured microphone is retried when browser
+// microphone permission changes to granted. Retry remains available otherwise.
+call.on('localAudioCaptureStatusChanged', ({ status, error }) => {
+  if (status === 'failed') showMicrophoneError(error);
+});
+if (call.localAudioCaptureStatus === 'failed') {
+  await call.retryLocalAudio();
+}
+
 // Participants
 call.addParticipants(['user3', 'user4']);
 call.kickParticipants(['user3']);
